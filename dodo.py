@@ -52,47 +52,41 @@ if "/SelectRole" in driver.current_url:
     wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[name="uuid"][value="000d3a2480c380e711e75b09d9d47a73"]'))).click()
     wait.until(EC.url_contains("/PrepareExcelReport"))
 
-# ---------- 5. Диапазон дат: 1-е число месяца → вчера ----------
+# ---------- 5. Выставляем «Выбрать все» ОДИН раз ----------
+# ---------- 5.1 Выставляем «Выбрать все» в «Причина списания» (2-я колонка) ----------
+driver.find_element(By.CSS_SELECTOR, ".content").click()  # закрыть всё
+driver.find_element(By.CSS_SELECTOR, ".col-md-3:nth-child(1) .CaptionCont i").click()  # открыть список
+wait.until(EC.element_to_be_clickable(
+    (By.CSS_SELECTOR, ".open li:nth-child(1) i"))).click()  # «Выбрать все»
+time.sleep(0.2)
+
+# ---------- 5.2 Выставляем «Выбрать все» в «Отдел» (3-я колонка) ----------
+driver.find_element(By.CSS_SELECTOR, ".content").click()  # закрыть
+driver.find_element(By.CSS_SELECTOR, ".col-md-3:nth-child(2) .CaptionCont i").click()  # открыть список
+wait.until(EC.element_to_be_clickable(
+    (By.CSS_SELECTOR, ".open li:nth-child(1) i"))).click()  # «Выбрать все»
+time.sleep(0.2)
+
+# ---------- 6. Диапазон дат: 1-е число месяца → вчера ----------
 today = datetime.date.today()
 first = today.replace(day=1)
 yesterday = today - datetime.timedelta(days=1)
 date_list = [first + datetime.timedelta(days=i) for i in range((yesterday - first).days + 1)]
 
-# ---------- 6. Цикл по датам ----------
+# ---------- 7. Цикл по датам (меняем ТОЛЬКО даты) ----------
 with open(CSV_FILE, "w", newline='', encoding='utf-8') as f:
     writer = csv.writer(f, delimiter=':')
     for dt in date_list:
         str_date = dt.strftime("%d.%m.%Y")
 
-        # ------ StartDate = EndDate = текущая дата ------
+        # ------ меняем StartDate и EndDate ------
         for field in ("StartDate", "EndDate"):
             wait.until(EC.element_to_be_clickable((By.ID, field))).click()
             wait.until(EC.element_to_be_clickable((By.LINK_TEXT, str(dt.day)))).click()
             driver.find_element(By.CSS_SELECTOR, ".content").click()
 
-        # ---------- «Выбрать все» в кастом-multiselect ----------
-        # 1. Причина списания (вторая колонка)
-        driver.find_element(By.CSS_SELECTOR, ".content").click()  # закрыть всё
-        driver.find_element(By.CSS_SELECTOR, ".col-md-3:nth-child(1) .CaptionCont i").click()  # открыть список
-        wait.until(EC.element_to_be_clickable(
-            (By.CSS_SELECTOR, ".open li:nth-child(1) i"))).click() # «Выбрать все»
-        time.sleep(0.2)  # пусть успеет отметиться
-
-        # 2. Отдел (третья колонка)
-        driver.find_element(By.CSS_SELECTOR, ".content").click()  # закрыть
-        driver.find_element(By.CSS_SELECTOR, ".col-md-3:nth-child(2) .CaptionCont i").click()  # открыть список
-        wait.until(EC.element_to_be_clickable(
-            (By.CSS_SELECTOR, ".open li:nth-child(1) i"))).click()  # «Выбрать все»
-        time.sleep(0.2)
-
-
-
-
         # ------ формируем отчёт ------
         driver.find_element(By.NAME, "reportButton").click()
-
-
-
 
         # ------ парсим последнюю НЕПУСТУЮ ячейку totalValue ------
         all_totals = wait.until(
