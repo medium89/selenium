@@ -1,0 +1,27 @@
+version: "3.9"
+
+services:
+  selenium-app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: selenium-app:latest
+    container_name: selenium-app
+    environment:
+      # Headless by default; change to "0" to debug (GUI in container is not typical)
+      - HEADLESS=1
+      # For simple checks with office_manager.py
+      - START_URL
+      # Project Manager defaults (can be overridden at run time)
+      - ROLE_ID=8
+      - SELECT_DEPARTMENT_URL=https://officemanager.dodopizza.ru/Infrastructure/Authenticate/SelectDepartment
+      - BACK_TO_SELECT_ROLE_URL=https://officemanager.dodopizza.ru/Infrastructure/Authenticate/BackToSelectRole
+      - REPORT_URL=https://officemanager.dodopizza.ru/OfficeManager/Debiting/PrepareExcelReport
+      - CSV_FILE=/app/reports/project.csv
+    volumes:
+      # Reuse local auth/session profile and save reports to host
+      - ../profile:/profile:rw
+      - ../reports:/app/reports:rw
+    # Default command defined in Dockerfile runs app/OfficeManager.py
+    # To run Project Manager: `docker compose run --rm selenium-app python app/ProjectManager.py`
+    restart: "no"

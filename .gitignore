@@ -1,0 +1,18 @@
+@'
+# виртуальные окружения
+.venv/
+venv/
+env/
+
+# python-артефакты
+__pycache__/
+*.py[cod]
+*.egg-info/
+.build/
+dist/
+
+# IDE/инструменты
+.vscode/
+.idea/
+.mypy_cache/
+.pytest_cache/

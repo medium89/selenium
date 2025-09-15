@@ -1,0 +1,80 @@
+Docker: сборка и запуск app/OfficeManager.py (headless)
+
+Требования
+- Установлен Docker Desktop.
+- В каталоге проекта есть авторизованный профиль в `./profile` (GUI‑вход уже делали локально).
+
+Сборка образа (из корня репозитория)
+1) PowerShell:
+   docker compose -f docker/docker-compose.yml build
+
+Быстрая проверка (открыть chrome://version в headless)
+2) PowerShell:
+   $env:START_URL = "chrome://version/"
+   docker compose -f docker/docker-compose.yml run --rm selenium-app
+
+Запуск на целевой странице (SelectDepartment)
+3) PowerShell:
+   $env:START_URL = "https://officemanager.dodopizza.ru/Infrastructure/Authenticate/SelectDepartment"
+   docker compose -f docker/docker-compose.yml run --rm selenium-app
+
+Что происходит
+- Используется образ из `docker/Dockerfile` с Chromium и chromedriver.
+- Сервис `selenium-app` монтирует:
+  - `./profile` → `/profile` (внутри контейнера), чтобы использовать сохранённую сессию.
+- По умолчанию запускается `app/OfficeManager.py`, читает `START_URL` и открывает страницу в headless‑режиме. В консоли видно заголовок страницы.
+
+Примечания
+- В PowerShell используйте переменные окружения через `$env:VAR = "value"` перед командой.
+- HEADLESS уже включён в образе; для отладки можно попробовать `$env:HEADLESS = "0"`, но GUI внутри контейнера, как правило, не отображается в Windows.
+- Отчёты CSV не создаются `app/OfficeManager.py` (он демонстрационный). Для выгрузок используйте `app/ProjectManager.py` — отчёты появятся в `./reports`.
+
+Если видите ошибку про "user data directory is already in use"
+- Причина: при первом запуске `office_manager.py` пытается открыть GUI‑Chrome, а смонтированный профиль уже занят или содержит lock‑файлы.
+- Быстрое решение для контейнера: пометить, что авторизация уже выполнена, чтобы пропустить GUI‑шаг.
+  PowerShell в корне проекта:
+    New-Item -ItemType File -Path .\profile\.auth_initialized -Force
+  Затем повторите запуск (шаги 2–3). Скрипт пойдёт сразу в headless.
+- Дополнительно убедитесь, что локальный Chrome не использует `./profile`. При необходимости удалите lock‑файлы `Singleton*` и `DevToolsActivePort` внутри `./profile`.
+
+Альтернатива (bash)
+- Если запускаете в WSL/Unix‑шелле:
+  START_URL='chrome://version/' docker compose -f docker/docker-compose.yml run --rm selenium-app
+
+
+Полный набор команд (PowerShell)
+1) Сборка образа начисто:
+   docker compose -f docker/docker-compose.yml build --no-cache
+
+2) Очистка lock-файлов профиля (если ругается на user data directory):
+   Get-ChildItem -Path .\profile -Recurse -Force -Include "Singleton*", "DevToolsActivePort" | Remove-Item -Force -ErrorAction SilentlyContinue
+
+3) Запуск app/OfficeManager.py на целевой странице SelectDepartment (headless):
+   $env:START_URL = "https://officemanager.dodopizza.ru/Infrastructure/Authenticate/SelectDepartment"
+   docker compose -f docker/docker-compose.yml run --rm selenium-app
+
+Ожидаемый вывод:
+   [run] Launching Chrome (headless=True) with profile at /profile
+   [run] Opened: https://officemanager.dodopizza.ru/Infrastructure/Authenticate/SelectDepartment
+   [run] Title: <заголовок страницы>
+
+
+Генерация отчётов (app/ProjectManager.py)
+— Создаёт CSV в `./reports`.
+
+Команда (PowerShell, из корня):
+   docker compose -f docker/docker-compose.yml run --rm selenium-app python app/ProjectManager.py
+
+Опциональные переменные (если нужны другие значения):
+   $env:ROLE_ID = "8"
+   $env:SELECT_DEPARTMENT_URL = "https://officemanager.dodopizza.ru/Infrastructure/Authenticate/SelectDepartment"
+   $env:BACK_TO_SELECT_ROLE_URL = "https://officemanager.dodopizza.ru/Infrastructure/Authenticate/BackToSelectRole"
+   $env:REPORT_URL = "https://officemanager.dodopizza.ru/OfficeManager/Debiting/PrepareExcelReport"
+   $env:CSV_FILE = "/app/reports/project.csv"
+
+Проверка результата:
+   Get-Content .\reports\project.csv -TotalCount 20
+
+Важно:
+- Профиль `./profile` должен содержать валидную авторизованную сессию для `officemanager.dodopizza.ru`.
+- Если редиректит на логин и CSV не появляется — пройдите вход локально (вне контейнера) тем же профилем и повторите запуск.

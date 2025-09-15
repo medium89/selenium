@@ -1,0 +1,42 @@
+__pycache__
+.pytest_cache
+.git
+*.pyc
+*.pyo
+*.pyd
+*.log
+logs/*.log
+*.env
+*.sqlite
+*.db
+node_modules
+dist
+build
+venv
+.venv
+env
+.DS_Store
+profile
+profile/**
+report*.csv
+*.scv
+office.csv
+отчет.csv
+project.scv
+# виртуальные окружения
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.build/
+dist/
+
+# инструменты/IDE
+.vscode/
+.idea/
+.mypy_cache/
+.pytest_cache/
