@@ -1,335 +1,109 @@
-import os
-import json
-import sys
-import time
-import csv
-from pathlib import Path
-from glob import glob
-
 from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
+from webdriver_manager.chrome import ChromeDriverManager
+from typing import Optional, List, Tuple
 
-try:
-    # Optional: use webdriver-manager when no system chromedriver is provided
-    from webdriver_manager.chrome import ChromeDriverManager  # type: ignore
-except Exception:  # pragma: no cover
-    ChromeDriverManager = None  # type: ignore
+import csv
+import datetime
+import os
+import socket
+import subprocess
+import time
 
 
-# =========================
-# Defaults pinned in script
-# =========================
-
-# Страницы Office Manager
-LOGIN_URL = "https://officemanager.dodopizza.ru/Infrastructure/Authenticate/SelectDepartment"
-SELECT_DEPARTMENT_URL = LOGIN_URL
-BACK_TO_SELECT_ROLE_URL = "https://officemanager.dodopizza.ru/Infrastructure/Authenticate/BackToSelectRole"
+# Конфигурация по умолчанию (страницы и роль зашиты в коде)
+PORT = 9222
+CSV_FILE = "reports/office.csv"
 REPORT_URL = "https://officemanager.dodopizza.ru/OfficeManager/MaterialConsumption"
-ROLE_ID = "7"
+SELECT_DEPARTMENT_URL = "https://officemanager.dodopizza.ru/Infrastructure/Authenticate/SelectDepartment"
+BACK_TO_SELECT_ROLE_URL = "https://officemanager.dodopizza.ru/Infrastructure/Authenticate/BackToSelectRole"
+ROLE_ID = "7"  # роль Офис‑менеджера
+SLOW_DELAY = float(os.environ.get("SLOW_DELAY", "0"))
 
 
-def env_bool(name: str, default: bool = False) -> bool:
-    val = os.environ.get(name)
-    if val is None:
-        return default
-    return str(val).strip().lower() in {"1", "true", "yes", "y", "on"}
+class OfficeMaterialConsumptionReporter:
+    """Сбор данных по небольшому отчёту MaterialConsumption.
 
-
-def cleanup_profile_locks(user_data_dir: Path) -> None:
-    try:
-        targets = []
-        for sub in (user_data_dir, user_data_dir / "Default"):
-            for pattern in ("Singleton*", "DevToolsActivePort"):
-                targets.extend(Path(p) for p in glob(str(sub / pattern)))
-        for p in targets:
-            try:
-                if p.is_file() or p.is_symlink():
-                    p.unlink(missing_ok=True)
-            except Exception:
-                pass
-    except Exception:
-        pass
-
-
-def build_chrome(headless: bool, user_data_dir: Path) -> webdriver.Chrome:
-    options = Options()
-
-    # Attach existing profile to persist auth between runs
-    options.add_argument(f"--user-data-dir={str(user_data_dir)}")
-    # Ensure the default profile folder exists to avoid first-run popups
-    (user_data_dir / "Default").mkdir(parents=True, exist_ok=True)
-
-    # Best-effort: remove stale lock files from a mounted profile
-    cleanup_profile_locks(user_data_dir)
-
-    # Headless toggle
-    if headless:
-        # Modern headless mode
-        options.add_argument("--headless=new")
-        options.add_argument("--disable-gpu")
-
-    # Common sensible defaults (esp. for containers/CI)
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--window-size=1920,1080")
-
-    # Soften Selenium fingerprint in visible mode
-    try:
-        options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])
-        options.add_experimental_option("useAutomationExtension", False)
-        options.add_argument("--disable-blink-features=AutomationControlled")
-    except Exception:
-        pass
-
-    # Allow overriding Chromium binary location if provided
-    chrome_bin = os.environ.get("CHROME_BIN")
-    if chrome_bin:
-        options.binary_location = chrome_bin
-
-    # Prefer system chromedriver (e.g., from Docker image); fallback to manager
-    driver_path = os.environ.get("CHROMEDRIVER")
-    service: Service
-    if driver_path and Path(driver_path).exists():
-        service = Service(executable_path=driver_path)
-    else:
-        if ChromeDriverManager is None:
-            raise RuntimeError(
-                "Chromedriver not found and webdriver-manager is unavailable."
-            )
-        # Note: this may require network access on first run
-        service = Service(ChromeDriverManager().install())
-
-    driver = webdriver.Chrome(service=service, options=options)
-
-    # Hide navigator.webdriver and inject a top banner on every page
-    try:
-        banner_text = os.environ.get("BANNER_TEXT", "js работает")
-        anti_detect_js = (
-            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
-            "window.chrome = window.chrome || {};"
-            "window.chrome.app = window.chrome.app || {IsInstalled: false};"
-            "Object.defineProperty(navigator, 'plugins', {get: () => [1,2,3]});"
-            "Object.defineProperty(navigator, 'languages', {get: () => ['ru-RU','ru','en-US','en']});"
-            "try{const w=window; if(w.navigator && 'userAgentData' in w.navigator){Object.defineProperty(w.navigator,'userAgentData',{get:()=>undefined});}}catch(e){};"
-        )
-        banner_js = (
-            "(function(){try{var id='__om_banner__';var t="
-            + json.dumps(banner_text)
-            + ";var e=document.getElementById(id);if(!e){e=document.createElement('div');e.id=id;e.textContent=t;e.setAttribute('aria-live','polite');e.style.cssText='position:fixed;top:0;left:0;width:100%;height:auto;z-index:2147483647;background:linear-gradient(90deg,#111,#444);color:#fff;text-align:center;font:600 14px/32px -apple-system,system-ui,Segoe UI,Roboto,Arial,sans-serif;letter-spacing:.3px;box-shadow:0 2px 6px rgba(0,0,0,.25);pointer-events:none;';document.documentElement.appendChild(e);}else{e.textContent=t;}}catch(_e){}})();"
-        )
-        driver.execute_cdp_cmd(
-            "Page.addScriptToEvaluateOnNewDocument",
-            {"source": anti_detect_js + banner_js},
-        )
-    except Exception:
-        pass
-
-    return driver
-
-
-def main() -> int:
-    CSV_FILE = "reports/office.csv"
-    csv_path = Path(CSV_FILE)
-    try:
-        csv_path.parent.mkdir(parents=True, exist_ok=True)
-    except Exception:
-        pass
-
-    user_data_dir = Path(os.environ.get("USER_DATA_DIR", str(Path.cwd() / "profile")))
-    user_data_dir.mkdir(parents=True, exist_ok=True)
-
-    first_run_marker = user_data_dir / ".auth_initialized"
-    desired_headless = env_bool("HEADLESS", True)
-
-    if not first_run_marker.exists() and not desired_headless:
-        print("[auth] First run detected — launching Chrome with GUI for login…", flush=True)
-        try:
-            driver = build_chrome(headless=False, user_data_dir=user_data_dir)
-        except Exception as e:
-            print(f"[auth] Failed to launch GUI Chrome: {e}", file=sys.stderr)
-            return 1
-        try:
-            driver.get(SELECT_DEPARTMENT_URL)
-            print("[auth] Please complete login in the opened browser window.")
-            print("[auth] When finished, close the browser window or press ENTER here.")
-            start_time = time.time()
-            while True:
-                if not driver.window_handles:
-                    print("[auth] Browser window closed. Proceeding…")
-                    break
-                if sys.stdin in select_readable():
-                    _ = sys.stdin.readline()
-                    print("[auth] ENTER received. Proceeding…")
-                    break
-                if time.time() - start_time > 1800:
-                    print("[auth] Timeout reached (30m). Proceeding…")
-                    break
-                time.sleep(0.5)
-        finally:
-            try:
-                driver.quit()
-            except Exception:
-                pass
-        first_run_marker.write_text("ok", encoding="utf-8")
-        print("[auth] First-run auth completed. Marker written.")
-
-    headless_mode = desired_headless
-    print(f"[run] Launching Chrome (headless={headless_mode}) with profile at {user_data_dir}")
-
-    try:
-        driver = build_chrome(headless=headless_mode, user_data_dir=user_data_dir)
-    except Exception as e:
-        print(f"[run] Failed to launch Chrome: {e}", file=sys.stderr)
-        return 2
-
-    try:
-        runner = OfficeManagerRunner(driver=driver, csv_path=csv_path)
-        return runner.run()
-    finally:
-        try:
-            driver.quit()
-        except Exception:
-            pass
-
-
-def select_readable():
-    """Return a list of file-like objects ready for reading (stdin only)."""
-    try:
-        import select
-
-        rlist, _, _ = select.select([sys.stdin], [], [], 0)
-        return rlist
-    except Exception:
-        # On platforms where select on stdin is unsupported, just return empty
-        return []
-
-
- 
-
-
-def dump_table_to_csv(driver: webdriver.Chrome, csv_path: Path) -> int:
-    """Достаёт таблицу через JS одним снимком (устойчиво к stale-элементам).
-
-    Алгоритм:
-      - Берём #report table (или первый table) и собираем матрицу строк через JS
-      - Определяем строку заголовка с датами (где есть цифры)
-      - Числовые колонки = те, у кого в заголовке есть цифры (иначе последние 5)
-      - Пропускаем строку 'Ингредиент' и пустые
-      - Пишем: первая текстовая колонка (наименование) + числовые колонки
+    Структурно повторяет project_manager.py: страницы и роль зашиты,
+    последовательность переходов идентичная.
     """
-    matrix = []
-    # Несколько попыток на случай перерисовки отчёта
-    for _ in range(5):
-        try:
-            res = driver.execute_script(
-                """
-                var t = document.querySelector('#report table') || document.querySelector('table');
-                if(!t) return [];
-                return Array.from(t.querySelectorAll('tr')).map(tr =>
-                  Array.from(tr.querySelectorAll('th,td')).map(c => (c.textContent||'').trim())
-                );
-                """
-            )
-            matrix = res or []
-            if matrix and len(matrix) > 1:
-                break
-        except Exception:
-            pass
-        time.sleep(0.1)
-    if not matrix:
-        return 0
 
-    header = matrix[0]
-    num_cols = [i for i, h in enumerate(header) if any(ch.isdigit() for ch in (h or ""))]
-    if not num_cols and header:
-        num_cols = list(range(max(0, len(header) - 5), len(header)))
+    def __init__(self, port: int = PORT, csv_file: str = CSV_FILE, url: str = REPORT_URL, slow: float = SLOW_DELAY):
+        self.port = port
+        self.csv_file = csv_file
+        self.url = url
+        self.slow = slow
+        self.driver: Optional[webdriver.Chrome] = None
+        self.wait: Optional[WebDriverWait] = None
 
-    # Начало данных (пропустим подзаголовок 'Ингредиент')
-    start_data = 1
-    if len(matrix) > 1 and any("ингредиент" in (x or "").lower() for x in matrix[1]):
-        start_data = 2
-
-    written = 0
-    with csv_path.open("a", encoding="utf-8-sig", newline="") as f:
-        w = csv.writer(f, delimiter=";")
-        # Заголовок отделения (даты)
-        if num_cols:
-            hdr = ["НАИМЕНОВАНИЕ"] + [header[i] if i < len(header) else f"COL{i}" for i in num_cols]
-            w.writerow(hdr)
-        for row in matrix[start_data:]:
-            if not row:
-                continue
-            name = row[0] if row else ""
-            values = [row[i] if i < len(row) else "" for i in num_cols]
-            if not name and not any(v for v in values):
-                continue
-            # Filter: keep rows that have any digit in values
-            if not any(any(ch.isdigit() for ch in (v or "")) for v in values):
-                continue
-            w.writerow([name] + values)
-            written += 1
-    return written
-
-
-class OfficeManagerRunner:
-    def __init__(self, driver: webdriver.Chrome, csv_path: Path, wait_timeout: int = 25) -> None:
-        self.driver = driver
-        self.csv_path = csv_path
-        self.wait = WebDriverWait(driver, wait_timeout)
-
-    # ---------- Navigation / auth ----------
-    def ensure_role_selected(self) -> None:
-        if "/SelectRole" in self.driver.current_url:
-            # Wait roles to appear
+    # ---------- Инициализация браузера ----------
+    def launch_chrome(self):
+        print("[INIT] Настройка Chrome…")
+        if os.name == 'nt':
             try:
-                self.wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, '[name="roleId"]')))
-            except Exception:
-                return
-            # Log available roles
-            try:
-                roles = self.driver.execute_script(
-                    "return Array.from(document.querySelectorAll('[name=\"roleId\"]')).map(e=>({val:e.value||e.getAttribute('value')||'', text:(e.textContent||e.value||'').trim()}));"
-                ) or []
-                if roles:
-                    print("[role] Доступные роли:")
-                    for r in roles:
-                        print(f"[role] value={r.get('val')} text={r.get('text')}")
+                subprocess.run("taskkill /F /IM chrome.exe 2>nul", shell=True)
             except Exception:
                 pass
-            # Try click by exact value
-            clicked = False
-            for sel in (f'button[name="roleId"][value="{ROLE_ID}"]', f'[name="roleId"][value="{ROLE_ID}"]'):
+            try:
+                chrome_exe = rf"{os.environ.get('ProgramFiles','')}\\Google\\Chrome\\Application\\chrome.exe"
+            except Exception:
+                chrome_exe = None
+            if chrome_exe and os.path.exists(chrome_exe):
+                user_dir = os.environ.get("USER_DATA_DIR") or os.path.join(os.environ.get("TEMP", os.getcwd()), f"chrome{self.port}")
                 try:
-                    el = self.wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, sel)))
-                    try:
-                        self.driver.execute_script("arguments[0].scrollIntoView({block:'center'});", el)
-                    except Exception:
-                        pass
-                    el.click()
-                    clicked = True
-                    break
-                except Exception:
-                    continue
-            # Fallback: click the first role if specific value not found (to move forward)
-            if not clicked:
-                try:
-                    first = self.driver.find_element(By.CSS_SELECTOR, '[name="roleId"]')
-                    first.click()
-                    clicked = True
+                    os.makedirs(user_dir, exist_ok=True)
                 except Exception:
                     pass
-            # Wait to leave SelectRole
-            if clicked:
-                try:
-                    WebDriverWait(self.driver, 10).until(lambda d: "/SelectRole" not in d.current_url)
-                except Exception:
-                    print("[role] Не удалось покинуть SelectRole автоматически. Проверьте ROLE_ID.")
+                subprocess.Popen([
+                    chrome_exe,
+                    f"--remote-debugging-port={self.port}",
+                    f"--user-data-dir={user_dir}",
+                    "--no-first-run",
+                    "--no-default-browser-check",
+                ])
+                if not self._wait_port(self.port, 10):
+                    raise RuntimeError(f"Порт {self.port} не открылся")
+            else:
+                print("[INIT] Chrome.exe не найден, пропускаю внешний запуск.")
+        else:
+            print("[INIT] Linux/Docker: внешний Chrome не запускаю (использую драйвер).")
 
-    def open_select_department(self) -> None:
+    def _make_service(self) -> Service:
+        path = os.environ.get("CHROMEDRIVER", "/usr/bin/chromedriver")
+        if path and os.path.exists(path):
+            return Service(path)
+        return Service(ChromeDriverManager().install())
+
+    def connect_driver(self):
+        print("[DRIVER] Инициализация драйвера Chrome…")
+        options = webdriver.ChromeOptions()
+        if self._wait_port(self.port, 1):
+            print("[DRIVER] Найден debuggerAddress — подключаюсь к внешнему Chrome…")
+            options.add_experimental_option("debuggerAddress", f"127.0.0.1:{self.port}")
+            self.driver = webdriver.Chrome(service=self._make_service(), options=options)
+        else:
+            if os.environ.get("CHROME_BIN"):
+                options.binary_location = os.environ["CHROME_BIN"]
+            user_dir = os.environ.get("USER_DATA_DIR")
+            if user_dir:
+                try:
+                    os.makedirs(user_dir, exist_ok=True)
+                except Exception:
+                    pass
+                options.add_argument(f"--user-data-dir={user_dir}")
+            if os.environ.get("HEADLESS", "0") == "1":
+                options.add_argument("--headless=new")
+                options.add_argument("--no-sandbox")
+                options.add_argument("--disable-dev-shm-usage")
+            self.driver = webdriver.Chrome(service=self._make_service(), options=options)
+        self.wait = WebDriverWait(self.driver, 25)
+
+    # ---------- Навигация и авторизация ----------
+    def open_select_department(self):
+        print("[NAV] Перехожу на экран выбора города…")
         self.driver.get(SELECT_DEPARTMENT_URL)
         self.ensure_role_selected()
         if "/SelectDepartment" not in self.driver.current_url:
@@ -338,119 +112,95 @@ class OfficeManagerRunner:
             except Exception:
                 pass
 
-    def get_cities(self):
-        self.open_select_department()
-        print(f"[nav] Текущий URL: {self.driver.current_url}")
-        # If still on SelectRole, try once more to select the role
-        if "/SelectRole" in self.driver.current_url:
-            self.ensure_role_selected()
-            self.open_select_department()
-        self.wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, '*[name="uuid"]')))
-        items = self.driver.execute_script(
-            """
-            return Array.from(document.querySelectorAll('*[name="uuid"]')).map(b=>({
-              name:(b.textContent||'').trim(),
-              uuid:b.getAttribute('value')||b.getAttribute('data-value')||b.getAttribute('data-uuid')||b.getAttribute('uuid')||b.getAttribute('data-id')||''
-            })).filter(x=>x.name && x.uuid);
-            """
-        ) or []
-        seen=set(); cities=[]
-        for it in items:
-            uuid=it.get('uuid'); name=it.get('name')
-            if uuid and name and uuid not in seen:
-                seen.add(uuid); cities.append((name, uuid))
-        cities.sort(key=lambda x: x[0].lower())
-        return cities
-
-    def select_city(self, city_uuid: str) -> None:
-        self.open_select_department()
-        self.ensure_role_selected()
-        clicked = False
-        # Try via JS matching any element with name=uuid and matching id across attributes
+    def choose_role(self):
+        print(f"[AUTH] Выбираю роль {ROLE_ID}…")
         try:
-            clicked = bool(
-                self.driver.execute_script(
-                    """
-                    var uuid = arguments[0];
-                    var nodes = Array.from(document.querySelectorAll('*[name="uuid"]'));
-                    var el = nodes.find(function(n){
-                      var v = n.getAttribute('value') || n.getAttribute('data-value') || n.getAttribute('data-uuid') || n.getAttribute('uuid') || n.getAttribute('data-id') || '';
-                      return v === uuid;
-                    });
-                    if(el){ try{ el.scrollIntoView({block:'center'}); }catch(e){}
-                      el.click(); return true; }
-                    return false;
-                    """,
-                    city_uuid,
-                )
-            )
+            self.wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f'button[name="roleId"][value="{ROLE_ID}"]'))).click()
         except Exception:
-            clicked = False
-
-        # Fallback to specific selectors
-        if not clicked:
-            for sel in (
-                f'button[name="uuid"][value="{city_uuid}"]',
-                f'a[name="uuid"][value="{city_uuid}"]',
-                f'*[name="uuid"][value="{city_uuid}"]',
-            ):
-                try:
-                    el = self.wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, sel)))
-                    try:
-                        self.driver.execute_script("arguments[0].scrollIntoView({block:'center'});", el)
-                    except Exception:
-                        pass
-                    el.click()
-                    clicked = True
-                    break
-                except Exception:
-                    continue
-
-        # Wait a moment and ensure navigation proceeds
-        if clicked:
-            for _ in range(40):
-                try:
-                    if "/SelectDepartment" not in self.driver.current_url:
-                        break
-                except Exception:
-                    pass
-                time.sleep(0.05)
-
-    # ---------- Report helpers ----------
-    def open_report(self) -> None:
-        self.driver.get(REPORT_URL)
-        self.ensure_role_selected()
-        # Wait for department multiselect to become available
+            try:
+                self.wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f'[name="roleId"][value="{ROLE_ID}"]'))).click()
+            except Exception:
+                pass
         try:
-            self.wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, '#SelectedUnitIds option')))
-        except Exception:
-            time.sleep(0.2)
-
-    def compute_dates(self):
-        today = __import__('datetime').date.today()
-        start = today.replace(day=1)
-        yesterday = today - __import__('datetime').timedelta(days=1)
-        return start, yesterday
-
-    def set_period(self, start_date, end_date):
-        s = start_date.strftime("%d.%m.%Y"); e = end_date.strftime("%d.%m.%Y")
-        js = """
-        function setVal(sel, val){
-          var el=document.querySelector(sel); if(!el) return false;
-          el.value=val;
-          try{ el.dispatchEvent(new Event('input',{bubbles:true})); }catch(e){ var ev=document.createEvent('HTMLEvents'); ev.initEvent('input',true,false); el.dispatchEvent(ev); }
-          try{ el.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){ var ev2=document.createEvent('HTMLEvents'); ev2.initEvent('change',true,false); el.dispatchEvent(ev2); }
-          return true;
-        }
-        return [setVal('#StartDate', arguments[0]), setVal('#EndDate', arguments[1])];
-        """
-        try:
-            self.driver.execute_script(js, s, e)
+            WebDriverWait(self.driver, 10).until(lambda d: "/SelectRole" not in d.current_url)
         except Exception:
             pass
 
-    def get_departments(self):
-        names = []
+    def ensure_role_selected(self, city_uuid: Optional[str] = None):
+        if "/SelectRole" in self.driver.current_url:
+            self.choose_role()
+            if city_uuid:
+                try:
+                    self.wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f'button[name="uuid"][value="{city_uuid}"]'))).click()
+                except Exception:
+                    pass
+
+    # ---------- Города ----------
+    def get_cities(self) -> List[Tuple[str, str]]:
+        print("[CITIES] Собираю список городов…")
+        self.open_select_department()
+        self.wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'button[name="uuid"], a[name="uuid"]')))
+        try:
+            items = self.driver.execute_script(
+                """
+                return Array.from(document.querySelectorAll('button[name="uuid"], a[name="uuid"]'))
+                  .map(b => ({
+                    name: (b.textContent || '').trim(),
+                    uuid: b.getAttribute('value') || b.getAttribute('data-value') || b.getAttribute('data-uuid') ||
+                          b.getAttribute('uuid') || b.getAttribute('data-id') || '',
+                    tag: b.tagName
+                  }))
+                  .filter(x => x.name && x.uuid);
+                """
+            ) or []
+        except Exception:
+            items = []
+        seen = set()
+        cities: List[Tuple[str, str]] = []
+        for it in items:
+            uuid = it.get('uuid')
+            name = it.get('name')
+            if uuid and uuid not in seen:
+                seen.add(uuid)
+                cities.append((name, uuid))
+        cities.sort(key=lambda x: x[0].lower())
+        if not cities:
+            raise RuntimeError("Не удалось получить список городов")
+        print(f"[CITIES] Найдено городов: {len(cities)}")
+        return cities
+
+    def select_city(self, city_uuid: str):
+        self.open_select_department()
+        self.ensure_role_selected()
+        try:
+            self.wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f'button[name="uuid"][value="{city_uuid}"]'))).click()
+        except Exception:
+            self.wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f'a[name="uuid"][value="{city_uuid}"]'))).click()
+        time.sleep(0.2)
+
+    def open_report_for_city(self, city_uuid: str):
+        print("[NAV] Перехожу на страницу MaterialConsumption…")
+        self.driver.get(REPORT_URL)
+        self.ensure_role_selected(city_uuid)
+
+    def back_to_select_role(self):
+        print("[NAV] Возврат на SelectRole…")
+        try:
+            self.driver.get(BACK_TO_SELECT_ROLE_URL)
+        except Exception:
+            pass
+        try:
+            WebDriverWait(self.driver, 10).until(EC.url_contains("/SelectRole"))
+        except Exception:
+            pass
+        if "/SelectRole" in self.driver.current_url:
+            self.choose_role()
+        self.open_select_department()
+
+    # ---------- Отделы и фильтры ----------
+    def get_departments(self) -> List[str]:
+        print("[DEPTS] Получаю список отделов…")
+        names: List[str] = []
         for _ in range(100):
             try:
                 names = self.driver.execute_script(
@@ -461,119 +211,238 @@ class OfficeManagerRunner:
             if names:
                 break
             time.sleep(0.1)
+        if not names:
+            raise RuntimeError("Список отделов пуст (SelectedUnitIds)")
         return names
 
-    def select_only_department(self, dept_name: str):
+    def choose_department(self, name: str):
+        js = """
+        (function(targetText){
+          var s = document.getElementById('SelectedUnitIds');
+          if(!s) return false;
+          var changed = false;
+          for (var i=0; i<s.options.length; i++) {
+            var o = s.options[i];
+            var sel = ((o.text||'').trim() === targetText);
+            if (o.selected !== sel) { o.selected = sel; changed = true; }
+          }
+          if (changed) {
+            var e; try{ e=new Event('change',{bubbles:true}); } catch(err){ e=document.createEvent('HTMLEvents'); e.initEvent('change',true,false); }
+            s.dispatchEvent(e);
+            if (window.$ && window.$(s).selectpicker) { try { window.$(s).selectpicker('render'); } catch(e){} }
+          }
+          return true;
+        })(arguments[0]);
+        """
+        try:
+            self.driver.execute_script(js, name)
+        except Exception:
+            pass
+        if self.slow:
+            time.sleep(self.slow)
+
+    # ---------- Построение и чтение отчёта ----------
+    def build_for_date(self, dt: datetime.date):
+        date_str = dt.strftime("%d.%m.%Y")
+        # Тип представления: период
+        try:
+            self.driver.execute_script(
+                "var s=document.getElementById('CurrentViewType'); if(s){ s.value='Full'; var e; try{e=new Event('change',{bubbles:true});}catch(err){e=document.createEvent('HTMLEvents'); e.initEvent('change',true,false);} s.dispatchEvent(e);}"
+            )
+        except Exception:
+            pass
+        # Дождаться появления полей периода
+        try:
+            self.wait.until(EC.presence_of_element_located((By.ID, 'DatePeriodStart')))
+            self.wait.until(EC.presence_of_element_located((By.ID, 'DatePeriodEnd')))
+        except Exception:
+            pass
+        # Установить даты (одинаковые для одного дня)
         try:
             self.driver.execute_script(
                 """
-                var s=document.getElementById('SelectedUnitIds'); if(!s) return false;
-                var name=arguments[0];
-                Array.from(s.options).forEach(o => o.selected=((o.text||'').trim()===name));
-                var e; try{e=new Event('change',{bubbles:true});}catch(err){e=document.createEvent('HTMLEvents'); e.initEvent('change',true,false);} s.dispatchEvent(e);
-                return true;
+                var s=document.getElementById('DatePeriodStart'); var e=document.getElementById('DatePeriodEnd');
+                if(s){ s.value=arguments[0]; s.dispatchEvent(new Event('input',{bubbles:true})); s.dispatchEvent(new Event('change',{bubbles:true})); }
+                if(e){ e.value=arguments[0]; e.dispatchEvent(new Event('input',{bubbles:true})); e.dispatchEvent(new Event('change',{bubbles:true})); }
                 """,
-                dept_name,
+                date_str,
             )
         except Exception:
             pass
 
-    def click_build(self):
+        # Сигнатура текущей таблицы до построения
+        old_sig = None
         try:
-            btn = self.wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#buildReportButton, [name="reportButton"]')))
-            try:
-                self.driver.execute_script("arguments[0].scrollIntoView({block:'center'});", btn)
-            except Exception:
-                pass
-            btn.click()
+            old_sig = self.driver.execute_script(
+                "var t=document.querySelector('table.table.table-nonfluid tbody'); return t ? t.innerText.length : null;"
+            )
         except Exception:
+            pass
+
+        # Нажать кнопку построения
+        clicked = False
+        try:
+            el = self.wait.until(EC.element_to_be_clickable((By.ID, 'buildReportButton')))
             try:
-                self.driver.execute_script("if(window.buildReport){buildReport();}")
+                self.driver.execute_script("arguments[0].scrollIntoView({block:'center'});", el)
             except Exception:
                 pass
+            el.click()
+            clicked = True
+        except Exception:
+            pass
 
-    def append_csv_row(self, row):
-        with self.csv_path.open("a", newline="", encoding="utf-8-sig") as f:
-            import csv as _csv
-            _csv.writer(f, delimiter=";").writerow(row)
+        if not clicked:
+            try:
+                self.driver.execute_script("if (typeof buildReport === 'function') buildReport();")
+                clicked = True
+            except Exception:
+                clicked = False
+
+        if not clicked:
+            for by, sel in [
+                (By.XPATH, "//input[@id='buildReportButton' and @value='Построить']"),
+                (By.XPATH, "//button[normalize-space()='Построить']"),
+                (By.XPATH, "//input[@type='button' and @value='Построить']"),
+                (By.CSS_SELECTOR, "#buildReportButton, [name='reportButton']"),
+            ]:
+                try:
+                    el = self.wait.until(EC.element_to_be_clickable((by, sel)))
+                    el.click()
+                    clicked = True
+                    break
+                except Exception:
+                    continue
+
+        if old_sig is not None:
+            for _ in range(200):
+                try:
+                    new_sig = self.driver.execute_script(
+                        "var t=document.querySelector('table.table.table-nonfluid tbody'); return t ? t.innerText.length : null;"
+                    )
+                    if new_sig != old_sig:
+                        break
+                except Exception:
+                    pass
+                time.sleep(0.05)
+
+    def read_table_rows(self) -> List[Tuple[str, List[str]]]:
+        self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "table.table.table-nonfluid tbody tr")))
+        rows = self.driver.find_elements(By.CSS_SELECTOR, "table.table.table-nonfluid tbody tr")
+        result: List[Tuple[str, List[str]]] = []
+        for tr in rows:
+            tds = tr.find_elements(By.TAG_NAME, "td")
+            if not tds:
+                continue
+            name = (tds[0].text or "").strip()
+            values: List[str] = []
+            cols = tds[1:6]  # первые 5 числовых колонок
+            for td in cols:
+                txt = (td.text or "").strip().replace("\xa0", "").replace(" ", "")
+                values.append(txt)
+            result.append((name, values))
+        return result
+
+    # ---------- Даты и CSV ----------
+    def compute_dates(self) -> List[datetime.date]:
+        today = datetime.date.today()
+        start = today.replace(day=1)
+        yesterday = today - datetime.timedelta(days=1)
+        if yesterday < start:
+            print("[DATES] Сегодня 1-е: диапазон пуст.")
+            return []
+        return [start + datetime.timedelta(days=i) for i in range((yesterday - start).days + 1)]
 
     def reset_csv(self):
-        with self.csv_path.open("w", newline="", encoding="utf-8-sig") as f:
-            f.write("\ufeff")
+        # Ensure target directory exists
+        try:
+            d = os.path.dirname(self.csv_file)
+            if d:
+                os.makedirs(d, exist_ok=True)
+        except Exception:
+            pass
+        with open(self.csv_file, "w", encoding="utf-8-sig", newline="") as f:
+            w = csv.writer(f, delimiter=';')
+            w.writerow([
+                "Город", "Отдел", "Дата", "Категория",
+                "Продажи", "Производство", "Питание персонала", "Отмена", "Брак"
+            ])
 
-    def run(self) -> int:
+    def append_csv_rows(self, rows: List[List[str]]):
+        with open(self.csv_file, "a", encoding="utf-8-sig", newline="") as f:
+            csv.writer(f, delimiter=';').writerows(rows)
+
+    # ---------- Основной сценарий ----------
+    def process_city(self, city_name: str, city_uuid: str, dates: List[datetime.date]):
+        print("\n" + "#" * 80)
+        print(f"[CITY] {city_name}")
+        self.select_city(city_uuid)
+        self.open_report_for_city(city_uuid)
+
+        departments = self.get_departments()
+        print(f"[DEPTS] Найдено отделов: {len(departments)}")
+
+        for dept in departments:
+            print("\n" + "=" * 80)
+            print(f"[DEPT] {dept}")
+            self.choose_department(dept)
+            for dt in dates:
+                self.build_for_date(dt)
+                rows = self.read_table_rows()
+                out_rows: List[List[str]] = []
+                for cat, vals in rows:
+                    out_rows.append([
+                        city_name,
+                        dept,
+                        dt.strftime("%d.%m.%Y"),
+                        cat,
+                        *vals
+                    ])
+                self.append_csv_rows(out_rows)
+                print(f"[CSV] {dept} — {dt:%d.%m.%Y}: {len(rows)} строк")
+
+    def run(self):
+        self.launch_chrome()
+        self.connect_driver()
+        dates = self.compute_dates()
         self.reset_csv()
+
         cities = self.get_cities()
-        print(f"[cities] Найдено: {len(cities)} — {', '.join([c[0] for c in cities])}")
-        start, end = self.compute_dates()
-        print(f"[dates] Период: {start:%d.%m.%Y} — {end:%d.%m.%Y}")
-
+        print(f"[CITIES] К обработке: {[c[0] for c in cities]}")
         for cidx, (city_name, city_uuid) in enumerate(cities, start=1):
-            print("\n" + "#" * 80)
-            print(f"[city] ({cidx}/{len(cities)}) {city_name}")
+            print(f"[CITY IDX] ({cidx}/{len(cities)})")
             try:
-                self.select_city(city_uuid)
-                self.open_report()
-                self.set_period(start, end)
-                departments = self.get_departments()
-                print(f"[depts] {departments}")
-                self.append_csv_row([f"ГОРОД: {city_name}"])
-
-                for didx, dept in enumerate(departments, start=1):
-                    print("\n" + "=" * 80)
-                    print(f"[dept] ({didx}/{len(departments)}) {dept}")
-                    self.append_csv_row([f"ОТДЕЛ: {dept}"])
-                    self.select_only_department(dept)
-
-                    old_html = None
-                    try:
-                        old_html = self.driver.find_element(By.CSS_SELECTOR, "#report").get_attribute("innerHTML")
-                    except Exception:
-                        pass
-                    self.click_build()
-                    if old_html is not None:
-                        for _ in range(200):
-                            try:
-                                if self.driver.find_element(By.CSS_SELECTOR, "#report").get_attribute("innerHTML") != old_html:
-                                    break
-                            except Exception:
-                                pass
-                            time.sleep(0.05)
-
-                    # Dump current table
-                    try:
-                        _ = dump_table_to_csv(self.driver, self.csv_path)
-                    except Exception as e:
-                        print(f"[csv] dump failed: {e}")
-                    # separator
-                    self.append_csv_row([""])
-
+                self.process_city(city_name, city_uuid, dates)
             except Exception as e:
-                print(f"[warn] Ошибка по городу {city_name}: {e}")
-                self.append_csv_row([f"ГОРОД: {city_name}", f"ОШИБКА: {e}"])
-                self.append_csv_row([""])
-
-            # Return to role selection between cities to reset context
+                print(f"[WARN] Ошибка в городе {city_name}: {e}")
+                # Продолжим со следующими городами
             try:
                 self.back_to_select_role()
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[WARN] Не удалось вернуться на SelectRole: {e}")
 
-        print(f"[done] CSV: {self.csv_path}")
-        return 0
+        print(f"[DONE] Готово! Файл {self.csv_file} сохранён.")
 
-    def back_to_select_role(self) -> None:
+    def close(self):
         try:
-            self.driver.get(BACK_TO_SELECT_ROLE_URL)
+            if self.driver:
+                self.driver.quit()
         except Exception:
             pass
-        try:
-            WebDriverWait(self.driver, 10).until(EC.url_contains("/SelectRole"))
-        except Exception:
-            pass
-        self.ensure_role_selected()
-        self.open_select_department()
+
+    @staticmethod
+    def _wait_port(port: int, timeout: int = 10) -> bool:
+        for _ in range(timeout * 10):
+            with socket.socket() as s:
+                if s.connect_ex(("127.0.0.1", port)) == 0:
+                    return True
+            time.sleep(0.1)
+        return False
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    bot = OfficeMaterialConsumptionReporter()
+    try:
+        bot.run()
+    finally:
+        bot.close()

@@ -1,9 +1,72 @@
-[4227:4227:0915/111929.566744:INFO:components/enterprise/browser/controller/chrome_browser_cloud_management_controller.cc:206] No machine level policy manager exists.
-[4227:4227:0915/111929.858333:ERROR:dbus/object_proxy.cc:573] Failed to call method: org.freedesktop.DBus.Properties.GetAll: object_path= /org/freedesktop/UPower/devices/DisplayDevice: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.UPower was not provided by any .service files
-[4227:4227:0915/111929.859348:WARNING:dbus/property.cc:179] GetAll request failed for: org.freedesktop.UPower.Device
-[4227:4227:0915/111929.869520:WARNING:ui/base/idle/idle_linux.cc:98] None of the known D-Bus ScreenSaver services could be used.
-[4258:4258:0915/111929.963082:WARNING:ui/gfx/linux/gpu_memory_buffer_support_x11.cc:49] dri3 extension not supported.
-[4258:4258:0915/111930.047335:WARNING:sandbox/policy/linux/sandbox_linux.cc:414] InitializeSandbox() called with multiple threads in process gpu-process.
-[4227:4245:0915/111933.743932:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
-[4259:4270:0915/111935.624110:WARNING:net/extras/sqlite/sqlite_persistent_store_backend_base.cc:176] Failed to post task from FlushAndNotifyInBackground@net/extras/sqlite/sqlite_persistent_store_backend_base.cc:226 to client_task_runner_.
-[4259:4270:0915/111935.624704:WARNING:net/extras/sqlite/sqlite_persistent_store_backend_base.cc:176] Failed to post task from FlushAndNotifyInBackground@net/extras/sqlite/sqlite_persistent_store_backend_base.cc:226 to client_task_runner_.
+[7400:7400:0915/120526.677352:WARNING:chrome/browser/signin/account_consistency_mode_manager.cc:74] Desktop Identity Consistency cannot be enabled as no OAuth client ID and client secret have been configured.
+[7443:7443:0915/120526.741107:ERROR:components/viz/service/main/viz_main_impl.cc:189] Exiting GPU process due to errors during initialization
+[7527:7527:0915/120527.067854:ERROR:components/viz/service/main/viz_main_impl.cc:189] Exiting GPU process due to errors during initialization
+[7400:7400:0915/120527.183973:ERROR:dbus/object_proxy.cc:573] Failed to call method: org.freedesktop.DBus.Properties.GetAll: object_path= /org/freedesktop/UPower/devices/DisplayDevice: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.UPower was not provided by any .service files
+[7400:7400:0915/120527.206753:WARNING:dbus/property.cc:179] GetAll request failed for: org.freedesktop.UPower.Device
+[7400:7400:0915/120527.229541:WARNING:ui/base/idle/idle_linux.cc:98] None of the known D-Bus ScreenSaver services could be used.
+[7562:7562:0915/120527.264674:ERROR:components/viz/service/main/viz_main_impl.cc:189] Exiting GPU process due to errors during initialization
+[7595:7595:0915/120527.295898:WARNING:ui/gfx/linux/gpu_memory_buffer_support_x11.cc:49] dri3 extension not supported.
+[7595:7595:0915/120527.297596:WARNING:sandbox/policy/linux/sandbox_linux.cc:414] InitializeSandbox() called with multiple threads in process gpu-process.
+[7400:7440:0915/120527.505381:WARNING:net/disk_cache/blockfile/backend_impl.cc:1859] Destroying invalid entry.
+[7646:20:0915/120530.149888:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:924] Running WebRTC with a combined Network and Worker thread.
+[7400:7400:0915/120530.885493:INFO:CONSOLE:8] "Error parsing a meta element's content: ';' is not a valid key-value pair separator. Please use ',' instead.", source: https://officemanager.dodopizza.ru/OfficeManager/MaterialConsumption (8)
+[7646:20:0915/120531.075148:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:924] Running WebRTC with a combined Network and Worker thread.
+[7400:7422:0915/120534.122205:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+[7400:7422:0915/120556.530134:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+[7595:7618:0915/120615.969722:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:521] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[7595:7618:0915/120616.074532:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:521] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[7595:7618:0915/120616.075287:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:521] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[7595:7618:0915/120616.075608:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:521] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[7595:7618:0915/120616.075870:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:521] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[7595:7618:0915/120616.076180:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:521] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[7595:7618:0915/120616.076475:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:521] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[7595:7618:0915/120616.076943:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:521] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[7595:7618:0915/120616.077278:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:521] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[7595:7618:0915/120616.077583:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:521] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[7595:7618:0915/120616.077855:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:521] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[7595:7618:0915/120616.078150:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:521] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[7595:7618:0915/120616.078419:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:521] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[7595:7618:0915/120616.078661:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:521] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[7595:7618:0915/120616.089590:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:521] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[7595:7618:0915/120616.089927:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:521] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[7595:7618:0915/120616.090613:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:521] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[7595:7618:0915/120616.090896:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:521] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[7595:7618:0915/120616.091262:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:521] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[7595:7618:0915/120616.091744:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:521] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[7595:7618:0915/120616.092230:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:521] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[7595:7618:0915/120616.092684:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:521] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[7595:7618:0915/120616.093038:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:521] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[7595:7618:0915/120616.093581:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:521] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[7595:7618:0915/120616.093896:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:521] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[7595:7618:0915/120616.094242:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:521] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[7595:7618:0915/120616.094705:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:521] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[7595:7618:0915/120616.095121:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:521] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[7646:20:0915/120617.277032:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:924] Running WebRTC with a combined Network and Worker thread.
+[7400:7400:0915/120619.762812:INFO:CONSOLE:7] "Uncaught (in promise) Error: Unable to resolve specifier 'vacancies' imported from https://officemanager.dodopizza.ru/appshell/dist/initPublicPaths.bundle.p3ikTi4A.js", source: https://officemanager.dodopizza.ru/appshell/dist/supportScripts.bundle.Cg5SS7DQ.js (7)
+[7400:7400:0915/120619.895301:INFO:CONSOLE:8] "Error parsing a meta element's content: ';' is not a valid key-value pair separator. Please use ',' instead.", source: https://officemanager.dodopizza.ru/OfficeManager/MaterialConsumption (8)
+[7444:7458:0915/120619.905305:WARNING:net/spdy/spdy_session.cc:3074] Received HEADERS for invalid stream 5
+[7444:7458:0915/120619.945281:WARNING:net/spdy/spdy_session.cc:3074] Received HEADERS for invalid stream 7
+[7646:20:0915/120620.035003:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:924] Running WebRTC with a combined Network and Worker thread.
+[7646:21:0915/120620.470812:WARNING:third_party/webrtc/media/engine/webrtc_voice_engine.cc:805] Attempting to stop aecdump when no audio processing module is present
+[7646:21:0915/120622.456171:WARNING:third_party/webrtc/media/engine/webrtc_voice_engine.cc:805] Attempting to stop aecdump when no audio processing module is present
+[7646:20:0915/120654.799064:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:924] Running WebRTC with a combined Network and Worker thread.
+[7400:7422:0915/120654.993542:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+[7400:7400:0915/120655.565059:INFO:CONSOLE:8] "Error parsing a meta element's content: ';' is not a valid key-value pair separator. Please use ',' instead.", source: https://officemanager.dodopizza.ru/OfficeManager/MaterialConsumption (8)
+[7646:20:0915/120655.721332:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:924] Running WebRTC with a combined Network and Worker thread.
+[7646:21:0915/120656.117125:WARNING:third_party/webrtc/media/engine/webrtc_voice_engine.cc:805] Attempting to stop aecdump when no audio processing module is present
+[7646:21:0915/120658.255402:WARNING:third_party/webrtc/media/engine/webrtc_voice_engine.cc:805] Attempting to stop aecdump when no audio processing module is present
+[7646:20:0915/120730.571368:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:924] Running WebRTC with a combined Network and Worker thread.
+[7400:7400:0915/120731.192534:INFO:CONSOLE:8] "Error parsing a meta element's content: ';' is not a valid key-value pair separator. Please use ',' instead.", source: https://officemanager.dodopizza.ru/OfficeManager/MaterialConsumption (8)
+[7444:7458:0915/120731.229821:WARNING:net/spdy/spdy_session.cc:3029] Received WINDOW_UPDATE for invalid stream 39
+[7646:20:0915/120731.333145:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:924] Running WebRTC with a combined Network and Worker thread.
+[7646:21:0915/120734.865338:WARNING:third_party/webrtc/media/engine/webrtc_voice_engine.cc:805] Attempting to stop aecdump when no audio processing module is present
+[7646:21:0915/120734.865920:WARNING:third_party/webrtc/media/engine/webrtc_voice_engine.cc:805] Attempting to stop aecdump when no audio processing module is present
+[7646:21:0915/120740.171182:WARNING:third_party/webrtc/media/engine/webrtc_voice_engine.cc:805] Attempting to stop aecdump when no audio processing module is present
+[7400:7422:0915/120850.262166:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+[7646:20:0915/121053.580994:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:924] Running WebRTC with a combined Network and Worker thread.
+[7400:7400:0915/121054.536293:INFO:CONSOLE:8] "Error parsing a meta element's content: ';' is not a valid key-value pair separator. Please use ',' instead.", source: https://officemanager.dodopizza.ru/OfficeManager/MaterialConsumption (8)
+[7444:7458:0915/121054.620615:WARNING:net/spdy/spdy_session.cc:3029] Received WINDOW_UPDATE for invalid stream 55
+[7646:20:0915/121054.707936:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:924] Running WebRTC with a combined Network and Worker thread.
+[7646:21:0915/121055.143791:WARNING:third_party/webrtc/media/engine/webrtc_voice_engine.cc:805] Attempting to stop aecdump when no audio processing module is present
+[7646:21:0915/121057.305389:WARNING:third_party/webrtc/media/engine/webrtc_voice_engine.cc:805] Attempting to stop aecdump when no audio processing module is present
+[7444:7458:0915/121117.116614:WARNING:net/spdy/spdy_session.cc:3029] Received WINDOW_UPDATE for invalid stream 61
