@@ -340,6 +340,14 @@ class OfficeMaterialConsumptionReporter:
             for td in cols:
                 txt = (td.text or "").strip().replace("\xa0", "").replace(" ", "")
                 values.append(txt)
+                # Подсветим сохраняемые значения зелёным, как в project_manager.py
+                try:
+                    self.driver.execute_script(
+                        "arguments[0].style.backgroundColor='#00ff00';arguments[0].style.color='#000';",
+                        td,
+                    )
+                except Exception:
+                    pass
             result.append((name, values))
         return result
 
