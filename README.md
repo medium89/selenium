@@ -1,43 +1,68 @@
-**Обзор**
-- Скрипты в `app/` автоматизируют Chrome через Selenium.
-- `app/OfficeManager.py`: открывает страницу и сохраняет таблицу в CSV.
-- `app/ProjectManager.py`: строит отчёты по городам/отделам и сохраняет CSV.
-- Docker‑образ содержит Chromium и Chromedriver, запускается в headless и использует локальный профиль из `./profile`.
+Selenium-скрипты и запуск через .venv
 
-**Требования**
-- Docker Desktop (Windows/macOS/Linux).
-- Локальный профиль Chrome в `./profile` с действующей авторизацией для `officemanager.dodopizza.ru` (см. ниже «Разовый вход через GUI»).
+Коротко: в `app/` лежат скрипты для автоматизации Chrome через Selenium. Они собирают отчёты и сохраняют CSV в `./reports`. По умолчанию скрипты запускаются в headless и используют профиль `./profile`. Есть утилита для открытия страницы выбора роли с окном и меню запуска скриптов.
 
-**Структура**
-- `app/OfficeManager.py`: сохранение таблицы со страницы в `./reports/office.csv` (если таблицы нет — пишется заголовок страницы).
-- `app/ProjectManager.py`: генерация отчёта в `./reports/project.csv`.
-- `docker/Dockerfile`: образ с Chromium + Chromedriver.
-- `docker/docker-compose.yml`: сервис `selenium-app` и тома:
-  - `./profile:/profile` (профиль браузера)
-  - `./reports:/app/reports` (выгрузки CSV)
-- `docker/docker_init.id`: быстрые команды (PowerShell).
+Состав app/ и результаты
+- `app/OfficeManager.py`: MaterialConsumption по городам/отделам/датам → `reports/office.csv`.
+- `app/ProjectManager.py`: Debiting/PrepareExcelReport (итоги по дням) → `reports/project.csv`.
+- `app/RevisiaMetrics.py`: LossesAndExcees/«Статистика» с перебором ревизий → `reports/revisia.csv`.
+- `app/OpenSelectRole.py`: открывает страницу SelectRole и печатает доступные роли (GUI по умолчанию, окно не закрывает).
+- `app/init.py`: консольное меню выбора и запуска одного из скриптов.
+- `app/AnalyticsSpy.py`: сохраняет HTML страницы отчёта «Бизнес‑обзор/Аналитика» в `spizdil.html` (для отладки селекторов).
+- `app/AnalyticsLostRevenue.py`: собирает метрику «Доля упущенной выручки» по всем городам → `reports/lost_revenue.csv`.
 
-**Сборка образа**
-- PowerShell (из корня репозитория):
-  - `docker compose -f docker/docker-compose.yml build`
-  - Чистая пересборка: `docker compose -f docker/docker-compose.yml build --no-cache`
+Подготовка .venv
+- Windows (PowerShell):
+  - `py -3 -m venv .venv`
+  - `.\.venv\Scripts\Activate.ps1`
+  - `pip install -r config\requirements.txt`
+- Linux/macOS (bash/zsh):
+  - `python3 -m venv .venv`
+  - `source .venv/bin/activate`
+  - `pip install -r config/requirements.txt`
 
-**Запуск OfficeManager (CSV)**
-- Открыть целевой URL и сохранить таблицу в `./reports/office.csv`:
-- PowerShell:
-  - `# опционально; по умолчанию https://www.google.com`
-  - `$env:START_URL = "https://officemanager.dodopizza.ru/Infrastructure/Authenticate/SelectDepartment"`
-  - `docker compose -f docker/docker-compose.yml run --rm selenium-app`
+Запуск (дефолты зашиты)
+- `python app/OfficeManager.py`
+- `python app/ProjectManager.py`
+- `python app/RevisiaMetrics.py`
+- `python app/OpenSelectRole.py` — открыть SelectRole (GUI, окно не закрывается)
+- `python app/init.py` — меню выбора скрипта
+— Дополнительно:
+- `python app/AnalyticsSpy.py` — сохранить HTML отчёта в `spizdil.html`
+- `python app/AnalyticsLostRevenue.py` — собрать «Доля упущенной выручки» по всем городам
 
-**Запуск ProjectManager (CSV)**
-- Сохраняет в `./reports/project.csv`.
-- PowerShell:
-  - `docker compose -f docker/docker-compose.yml run --rm selenium-app python app/ProjectManager.py`
-- Проверить первые строки:
-  - `Get-Content .\reports\project.csv -TotalCount 20`
+Дефолты, зашитые в скриптах
+- Профиль: `USER_DATA_DIR=$PWD/profile` (создаётся, если нет).
+- Режим: `HEADLESS=1` (headless) для рабочих скриптов; у `OpenSelectRole.py` — `HEADLESS=0` по умолчанию.
+- Stealth: `STEALTH=1` (подмена UA, lang, таймзона, JS‑патчи, отключение AutomationControlled).
 
-**Профиль и авторизация**
-- Контейнер монтирует `./profile` в `/profile` и запускает Chrome с `--user-data-dir=/profile`.
+Расширенный ввод дат
+- Пустой ввод — вчерашняя дата.
+- `04` — 4 число текущего месяца и года.
+- `04102025` — 04.10.2025.
+- Также поддерживаются `ДД.ММ.ГГГГ`, `ДД‑ММ‑ГГГГ`, `ГГГГ‑ММ‑ДД`.
+
+Chrome с GUI и без
+- С окном: `HEADLESS=0 python app/OfficeManager.py` (или откройте `app/OpenSelectRole.py`).
+- Без окна: по умолчанию headless включён.
+- Если сайт отдаёт «Forbidden» в headless, используйте GUI или подключение к уже открытому Chrome: `chromium --user-data-dir="$PWD/profile" --remote-debugging-port=9222 about:blank`, затем запустите скрипт — он прицепится к открытому окну.
+
+Где искать результаты
+- `reports/office.csv` — MaterialConsumption.
+- `reports/project.csv` — Debiting/PrepareExcelReport.
+- `reports/revisia.csv` — LossesAndExcees/«Статистика».
+— Дополнительно: `reports/lost_revenue.csv` — «Доля упущенной выручки».
+CSV — UTF‑8 с BOM, разделитель `;`.
+
+Analytics: метрика «Доля упущенной выручки»
+- Сохранить HTML дашборда для отладки: `python app/AnalyticsSpy.py` (файл `spizdil.html` в корне).
+- Собрать метрику по всем городам: `python app/AnalyticsLostRevenue.py` (CSV: `reports/lost_revenue.csv`).
+- Если фильтры не применяются в headless, откройте Chrome с окном и портом: `chromium --user-data-dir="$PWD/profile" --remote-debugging-port=9225 about:blank`, затем запустите скрипт — он подключится к открытому окну.
+
+Быстрая диагностика
+- «user data directory is already in use» — закройте Chrome и удалите lock‑файлы в `profile/` (`Singleton*`, `DevToolsActivePort`).
+- «Forbidden» в headless — включите окно (`HEADLESS=0`) или подключайтесь к открытому Chrome (см. выше).
+- Нет данных — проверьте авторизацию профиля и актуальность роли/селекторов.
 - Если редиректит на `auth.dodois.io`, профиль не авторизован — выполните разовый вход через GUI локально, затем повторите запуск в Docker.
 
 **Разовый вход через GUI (локально, не в Docker)**

@@ -22,14 +22,11 @@ SELECT_DEPARTMENT_URL = "https://officemanager.dodopizza.ru/Infrastructure/Authe
 BACK_TO_SELECT_ROLE_URL = "https://officemanager.dodopizza.ru/Infrastructure/Authenticate/BackToSelectRole"
 ROLE_ID = "7"  # роль Офис‑менеджера
 SLOW_DELAY = float(os.environ.get("SLOW_DELAY", "0"))
+STEALTH = os.environ.get("STEALTH", "1")  # 1 — включить анти‑headless твики
 
 
 class OfficeMaterialConsumptionReporter:
-    """Сбор данных по небольшому отчёту MaterialConsumption.
-
-    Структурно повторяет project_manager.py: страницы и роль зашиты,
-    последовательность переходов идентичная.
-    """
+    """Сбор данных по отчёту MaterialConsumption."""
 
     def __init__(self, port: int = PORT, csv_file: str = CSV_FILE, url: str = REPORT_URL, slow: float = SLOW_DELAY):
         self.port = port
@@ -52,7 +49,7 @@ class OfficeMaterialConsumptionReporter:
             except Exception:
                 chrome_exe = None
             if chrome_exe and os.path.exists(chrome_exe):
-                user_dir = os.environ.get("USER_DATA_DIR") or os.path.join(os.environ.get("TEMP", os.getcwd()), f"chrome{self.port}")
+                user_dir = os.environ.get("USER_DATA_DIR") or os.path.join(os.getcwd(), "profile")
                 try:
                     os.makedirs(user_dir, exist_ok=True)
                 except Exception:
@@ -80,6 +77,13 @@ class OfficeMaterialConsumptionReporter:
     def connect_driver(self):
         print("[DRIVER] Инициализация драйвера Chrome…")
         options = webdriver.ChromeOptions()
+        # Лёгкие твики ещё на уровне опций
+        if STEALTH == "1":
+            options.add_experimental_option("excludeSwitches", ["enable-automation"])  # скрыть баннер automation
+            options.add_experimental_option("useAutomationExtension", False)
+            options.add_argument("--disable-blink-features=AutomationControlled")
+            options.add_argument("--lang=ru-RU")
+            options.add_argument("--window-size=1920,1080")
         if self._wait_port(self.port, 1):
             print("[DRIVER] Найден debuggerAddress — подключаюсь к внешнему Chrome…")
             options.add_experimental_option("debuggerAddress", f"127.0.0.1:{self.port}")
@@ -87,19 +91,24 @@ class OfficeMaterialConsumptionReporter:
         else:
             if os.environ.get("CHROME_BIN"):
                 options.binary_location = os.environ["CHROME_BIN"]
-            user_dir = os.environ.get("USER_DATA_DIR")
+            user_dir = os.environ.get("USER_DATA_DIR") or os.path.join(os.getcwd(), "profile")
             if user_dir:
                 try:
                     os.makedirs(user_dir, exist_ok=True)
                 except Exception:
                     pass
                 options.add_argument(f"--user-data-dir={user_dir}")
-            if os.environ.get("HEADLESS", "0") == "1":
+            if os.environ.get("HEADLESS", "1") == "1":
                 options.add_argument("--headless=new")
                 options.add_argument("--no-sandbox")
                 options.add_argument("--disable-dev-shm-usage")
+                options.add_argument("--disable-gpu")
             self.driver = webdriver.Chrome(service=self._make_service(), options=options)
         self.wait = WebDriverWait(self.driver, 25)
+
+        # Дополнительные анти‑headless настройки через CDP/JS
+        if STEALTH == "1":
+            self._apply_stealth()
 
     # ---------- Навигация и авторизация ----------
     def open_select_department(self):
@@ -114,6 +123,20 @@ class OfficeMaterialConsumptionReporter:
 
     def choose_role(self):
         print(f"[AUTH] Выбираю роль {ROLE_ID}…")
+        # Подсказка: выведем доступные роли, чтобы было проще подобрать ROLE_ID
+        try:
+            roles = self.driver.execute_script(
+                """
+                return Array.from(document.querySelectorAll('[name=\"roleId\"]'))
+                  .map(el => ({ value: el.getAttribute('value') || '', text: (el.textContent||el.value||'').trim() }));
+                """
+            ) or []
+            if roles:
+                print("[AUTH] Доступные роли:")
+                for r in roles:
+                    print(f"[AUTH] value={r.get('value')} text={r.get('text')}")
+        except Exception:
+            pass
         try:
             self.wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f'button[name="roleId"][value="{ROLE_ID}"]'))).click()
         except Exception:
@@ -139,7 +162,16 @@ class OfficeMaterialConsumptionReporter:
     def get_cities(self) -> List[Tuple[str, str]]:
         print("[CITIES] Собираю список городов…")
         self.open_select_department()
-        self.wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'button[name="uuid"], a[name="uuid"]')))
+        # Быстрый лог текущего URL для диагностики
+        try:
+            print(f"[DEBUG] current_url: {self.driver.current_url}")
+        except Exception:
+            pass
+        try:
+            self.wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'button[name="uuid"], a[name="uuid"]')))
+        except Exception:
+            self._debug_dump("cities-timeout")
+            raise
         try:
             items = self.driver.execute_script(
                 """
@@ -336,11 +368,10 @@ class OfficeMaterialConsumptionReporter:
                 continue
             name = (tds[0].text or "").strip()
             values: List[str] = []
-            cols = tds[1:6]  # первые 5 числовых колонок
+            cols = tds[1:6]
             for td in cols:
                 txt = (td.text or "").strip().replace("\xa0", "").replace(" ", "")
                 values.append(txt)
-                # Подсветим сохраняемые значения зелёным, как в project_manager.py
                 try:
                     self.driver.execute_script(
                         "arguments[0].style.backgroundColor='#00ff00';arguments[0].style.color='#000';",
@@ -361,8 +392,56 @@ class OfficeMaterialConsumptionReporter:
             return []
         return [start + datetime.timedelta(days=i) for i in range((yesterday - start).days + 1)]
 
+    def _parse_date(self, s: str) -> Optional[datetime.date]:
+        s = (s or "").strip()
+        today = datetime.date.today()
+        if not s:
+            return today - datetime.timedelta(days=1)
+        if s.isdigit():
+            if len(s) <= 2:
+                try:
+                    return datetime.date(today.year, today.month, int(s))
+                except Exception:
+                    return None
+            if len(s) == 8:
+                try:
+                    return datetime.datetime.strptime(s, "%d%m%Y").date()
+                except Exception:
+                    return None
+        for fmt in ("%d.%m.%Y", "%d-%m-%Y", "%Y-%m-%d"):
+            try:
+                return datetime.datetime.strptime(s, fmt).date()
+            except Exception:
+                continue
+        return None
+
+    def prompt_date_range(self) -> List[datetime.date]:
+        while True:
+            try:
+                start_raw = input("[INPUT] Начальная дата (ДД.ММ.ГГГГ): ").strip()
+            except EOFError:
+                start_raw = ""
+            start = self._parse_date(start_raw)
+            if not start:
+                print("[INPUT] Некорректная дата. Пример: 01.09.2025")
+                continue
+
+            try:
+                end_raw = input("[INPUT] Конечная дата (ДД.ММ.ГГГГ): ").strip()
+            except EOFError:
+                end_raw = ""
+            end = self._parse_date(end_raw)
+            if not end:
+                print("[INPUT] Некорректная дата. Пример: 30.09.2025")
+                continue
+
+            if end < start:
+                print("[INPUT] Конечная дата раньше начальной — поменял местами.")
+                start, end = end, start
+            days = (end - start).days + 1
+            return [start + datetime.timedelta(days=i) for i in range(days)]
+
     def reset_csv(self):
-        # Ensure target directory exists
         try:
             d = os.path.dirname(self.csv_file)
             if d:
@@ -376,9 +455,71 @@ class OfficeMaterialConsumptionReporter:
                 "Продажи", "Производство", "Питание персонала", "Отмена", "Брак"
             ])
 
-    def append_csv_rows(self, rows: List[List[str]]):
-        with open(self.csv_file, "a", encoding="utf-8-sig", newline="") as f:
-            csv.writer(f, delimiter=';').writerows(rows)
+    # ---------- Вспомогательная диагностика ----------
+    def _debug_dump(self, tag: str = "debug"):
+        try:
+            ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+            base_dir = os.path.join("logs", "debug")
+            try:
+                os.makedirs(base_dir, exist_ok=True)
+            except Exception:
+                pass
+            base = os.path.join(base_dir, f"{ts}-{tag}")
+            try:
+                self.driver.save_screenshot(base + ".png")
+            except Exception:
+                pass
+            try:
+                with open(base + ".html", "w", encoding="utf-8") as f:
+                    f.write(self.driver.page_source or "")
+            except Exception:
+                pass
+            try:
+                print(f"[DEBUG] dump saved: {base}.png, {base}.html")
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+    def _apply_stealth(self):
+        try:
+            try:
+                self.driver.execute_cdp_cmd("Network.enable", {})
+            except Exception:
+                pass
+            try:
+                ua = self.driver.execute_script("return navigator.userAgent") or ""
+            except Exception:
+                ua = ""
+            new_ua = ua.replace("HeadlessChrome", "Chrome") if ua else None
+            try:
+                args = {"userAgent": new_ua or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+                        "platform": "Win32"}
+                self.driver.execute_cdp_cmd("Network.setUserAgentOverride", args)
+            except Exception:
+                pass
+            try:
+                self.driver.execute_cdp_cmd("Network.setExtraHTTPHeaders", {
+                    "headers": {"Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7"}
+                })
+            except Exception:
+                pass
+            try:
+                self.driver.execute_cdp_cmd("Emulation.setTimezoneOverride", {"timezoneId": "Europe/Moscow"})
+            except Exception:
+                pass
+            try:
+                self.driver.execute_script(
+                    "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
+                    "window.chrome = window.chrome || { runtime: {} };"
+                    "Object.defineProperty(navigator, 'languages', {get: () => ['ru-RU','ru','en-US','en']});"
+                    "Object.defineProperty(navigator, 'plugins', {get: () => [1,2,3,4,5]});"
+                    "Object.defineProperty(navigator, 'platform', {get: () => 'Win32'});"
+                )
+            except Exception:
+                pass
+        except Exception:
+            pass
 
     # ---------- Основной сценарий ----------
     def process_city(self, city_name: str, city_uuid: str, dates: List[datetime.date]):
@@ -412,7 +553,11 @@ class OfficeMaterialConsumptionReporter:
     def run(self):
         self.launch_chrome()
         self.connect_driver()
-        dates = self.compute_dates()
+        dates = self.prompt_date_range()
+        if dates:
+            print(f"[DATES] Диапазон: {dates[0]:%d.%m.%Y} — {dates[-1]:%d.%m.%Y} (всего {len(dates)})")
+        else:
+            print("[DATES] Диапазон дат пуст — ничего обрабатывать.")
         self.reset_csv()
 
         cities = self.get_cities()
@@ -423,7 +568,6 @@ class OfficeMaterialConsumptionReporter:
                 self.process_city(city_name, city_uuid, dates)
             except Exception as e:
                 print(f"[WARN] Ошибка в городе {city_name}: {e}")
-                # Продолжим со следующими городами
             try:
                 self.back_to_select_role()
             except Exception as e:
@@ -454,3 +598,4 @@ if __name__ == "__main__":
         bot.run()
     finally:
         bot.close()
+

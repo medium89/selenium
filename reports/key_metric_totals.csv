@@ -1,0 +1,120 @@
+﻿Город;Дата;Доля упущенной выручки
+Абинск;07.10.2025;(нет данных)
+Абинск;07.10.2025;(нет данных)
+Абинск;07.10.2025;(нет данных)
+Ессентуки;07.10.2025;(нет данных)
+Кореновск;07.10.2025;ОШИБКА: Не удалось перейти на страницу Аналитики (перенаправляет на OperationalStatistics)
+Ставрополь;07.10.2025;"ОШИБКА: Message: no such window: target window already closed
+from unknown error: web view not found
+  (Session info: chrome=140.0.7339.207)
+Stacktrace:
+#0 0x562dd2d0a27a <unknown>
+#1 0x562dd27af030 <unknown>
+#2 0x562dd2784340 <unknown>
+#3 0x562dd282d858 <unknown>
+#4 0x562dd284aa8c <unknown>
+#5 0x562dd2825153 <unknown>
+#6 0x562dd27f1cba <unknown>
+#7 0x562dd27f2921 <unknown>
+#8 0x562dd2ccff3f <unknown>
+#9 0x562dd2cd3f68 <unknown>
+#10 0x562dd2cb7f9c <unknown>
+#11 0x562dd2cd470e <unknown>
+#12 0x562dd2c9fb7e <unknown>
+#13 0x562dd2cf7918 <unknown>
+#14 0x562dd2cf7b28 <unknown>
+#15 0x562dd2d08d0c <unknown>
+#16 0x7fe5d8894ac3 <unknown>
+"
+Тимашевск;07.10.2025;"ОШИБКА: Message: no such window: target window already closed
+from unknown error: web view not found
+  (Session info: chrome=140.0.7339.207)
+Stacktrace:
+#0 0x562dd2d0a27a <unknown>
+#1 0x562dd27af030 <unknown>
+#2 0x562dd2784340 <unknown>
+#3 0x562dd282d858 <unknown>
+#4 0x562dd284aa8c <unknown>
+#5 0x562dd2825153 <unknown>
+#6 0x562dd27f1cba <unknown>
+#7 0x562dd27f2921 <unknown>
+#8 0x562dd2ccff3f <unknown>
+#9 0x562dd2cd3f68 <unknown>
+#10 0x562dd2cb7f9c <unknown>
+#11 0x562dd2cd470e <unknown>
+#12 0x562dd2c9fb7e <unknown>
+#13 0x562dd2cf7918 <unknown>
+#14 0x562dd2cf7b28 <unknown>
+#15 0x562dd2d08d0c <unknown>
+#16 0x7fe5d8894ac3 <unknown>
+"
+Абинск;07.10.2025;6.32%
+Ессентуки;07.10.2025;(нет данных)
+Кореновск;07.10.2025;"ОШИБКА: Message: no such window: target window already closed
+from unknown error: web view not found
+  (Session info: chrome=140.0.7339.207)
+Stacktrace:
+#0 0x5607ec7f627a <unknown>
+#1 0x5607ec29b030 <unknown>
+#2 0x5607ec270340 <unknown>
+#3 0x5607ec319858 <unknown>
+#4 0x5607ec336a8c <unknown>
+#5 0x5607ec311153 <unknown>
+#6 0x5607ec2ddcba <unknown>
+#7 0x5607ec2de921 <unknown>
+#8 0x5607ec7bbf3f <unknown>
+#9 0x5607ec7bff68 <unknown>
+#10 0x5607ec7a3f9c <unknown>
+#11 0x5607ec7c070e <unknown>
+#12 0x5607ec78bb7e <unknown>
+#13 0x5607ec7e3918 <unknown>
+#14 0x5607ec7e3b28 <unknown>
+#15 0x5607ec7f4d0c <unknown>
+#16 0x7f2e7821dac3 <unknown>
+"
+Ставрополь;07.10.2025;"ОШИБКА: Message: no such window: target window already closed
+from unknown error: web view not found
+  (Session info: chrome=140.0.7339.207)
+Stacktrace:
+#0 0x5607ec7f627a <unknown>
+#1 0x5607ec29b030 <unknown>
+#2 0x5607ec270340 <unknown>
+#3 0x5607ec319858 <unknown>
+#4 0x5607ec336a8c <unknown>
+#5 0x5607ec311153 <unknown>
+#6 0x5607ec2ddcba <unknown>
+#7 0x5607ec2de921 <unknown>
+#8 0x5607ec7bbf3f <unknown>
+#9 0x5607ec7bff68 <unknown>
+#10 0x5607ec7a3f9c <unknown>
+#11 0x5607ec7c070e <unknown>
+#12 0x5607ec78bb7e <unknown>
+#13 0x5607ec7e3918 <unknown>
+#14 0x5607ec7e3b28 <unknown>
+#15 0x5607ec7f4d0c <unknown>
+#16 0x7f2e7821dac3 <unknown>
+"
+Тимашевск;07.10.2025;"ОШИБКА: Message: no such window: target window already closed
+from unknown error: web view not found
+  (Session info: chrome=140.0.7339.207)
+Stacktrace:
+#0 0x5607ec7f627a <unknown>
+#1 0x5607ec29b030 <unknown>
+#2 0x5607ec270340 <unknown>
+#3 0x5607ec319858 <unknown>
+#4 0x5607ec336a8c <unknown>
+#5 0x5607ec311153 <unknown>
+#6 0x5607ec2ddcba <unknown>
+#7 0x5607ec2de921 <unknown>
+#8 0x5607ec7bbf3f <unknown>
+#9 0x5607ec7bff68 <unknown>
+#10 0x5607ec7a3f9c <unknown>
+#11 0x5607ec7c070e <unknown>
+#12 0x5607ec78bb7e <unknown>
+#13 0x5607ec7e3918 <unknown>
+#14 0x5607ec7e3b28 <unknown>
+#15 0x5607ec7f4d0c <unknown>
+#16 0x7f2e7821dac3 <unknown>
+"
+Абинск;07.10.2025;0.00%
+Ессентуки;07.10.2025;1.09%

@@ -1,3 +1,14 @@
-2025/09/15-12:05:27.001 5 Reusing MANIFEST /mnt/e/_Server/_newserver/OSPanel/domains/selenium/profile/Default/Local Storage/leveldb/MANIFEST-000001
-2025/09/15-12:05:27.025 5 Recovering log #4
-2025/09/15-12:05:27.029 5 Reusing old log /mnt/e/_Server/_newserver/OSPanel/domains/selenium/profile/Default/Local Storage/leveldb/000004.log 
+2025/10/07-23:41:57.607 28e1 Reusing MANIFEST /mnt/e/_Server/_newserver/OSPanel/domains/selenium/profile/Default/Local Storage/leveldb/MANIFEST-000001
+2025/10/07-23:41:57.647 28e1 Recovering log #431
+2025/10/07-23:41:57.706 28e1 Level-0 table #434: started
+2025/10/07-23:41:57.762 28e1 Level-0 table #434: 435872 bytes OK
+2025/10/07-23:41:57.867 28e1 Delete type=0 #431
+2025/10/07-23:42:57.961 28e3 Level-0 table #437: started
+2025/10/07-23:42:58.008 28e3 Level-0 table #437: 441454 bytes OK
+2025/10/07-23:42:58.062 28e3 Delete type=0 #435
+2025/10/07-23:43:40.110 28e3 Level-0 table #439: started
+2025/10/07-23:43:40.209 28e3 Level-0 table #439: 443029 bytes OK
+2025/10/07-23:43:40.292 28e3 Delete type=0 #436
+2025/10/07-23:43:56.618 28e3 Level-0 table #441: started
+2025/10/07-23:43:56.705 28e3 Level-0 table #441: 443437 bytes OK
+2025/10/07-23:43:57.052 28e3 Delete type=0 #438

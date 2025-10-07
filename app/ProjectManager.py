@@ -38,6 +38,7 @@ ROLE_ID = "8"
 
 # Optional slow delay can still be overridden via env
 SLOW_DELAY = float(os.environ.get("SLOW_DELAY", "0"))
+STEALTH = True  # включено по умолчанию; можно отключить переменной среды
 
 
 # =========================
@@ -84,6 +85,11 @@ def build_chrome(headless: bool, user_data_dir: Path) -> webdriver.Chrome:
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920,1080")
+    if STEALTH:
+        options.add_experimental_option("excludeSwitches", ["enable-automation"])  # hide automation banner
+        options.add_experimental_option("useAutomationExtension", False)
+        options.add_argument("--disable-blink-features=AutomationControlled")
+        options.add_argument("--lang=ru-RU")
 
     chrome_bin = os.environ.get("CHROME_BIN")
     if chrome_bin:
@@ -99,7 +105,60 @@ def build_chrome(headless: bool, user_data_dir: Path) -> webdriver.Chrome:
             )
         service = Service(ChromeDriverManager().install())
 
-    return webdriver.Chrome(service=service, options=options)
+    driver = webdriver.Chrome(service=service, options=options)
+    if STEALTH:
+        try:
+            _apply_stealth(driver)
+        except Exception:
+            pass
+    return driver
+
+
+def _apply_stealth(driver: webdriver.Chrome) -> None:
+    try:
+        try:
+            driver.execute_cdp_cmd("Network.enable", {})
+        except Exception:
+            pass
+        try:
+            ua = driver.execute_script("return navigator.userAgent") or ""
+        except Exception:
+            ua = ""
+        new_ua = ua.replace("HeadlessChrome", "Chrome") if ua else None
+        try:
+            driver.execute_cdp_cmd(
+                "Network.setUserAgentOverride",
+                {
+                    "userAgent": new_ua
+                    or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+                    "platform": "Win32",
+                },
+            )
+        except Exception:
+            pass
+        try:
+            driver.execute_cdp_cmd(
+                "Network.setExtraHTTPHeaders",
+                {"headers": {"Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7"}},
+            )
+        except Exception:
+            pass
+        try:
+            driver.execute_cdp_cmd("Emulation.setTimezoneOverride", {"timezoneId": "Europe/Moscow"})
+        except Exception:
+            pass
+        try:
+            driver.execute_script(
+                "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
+                "window.chrome = window.chrome || { runtime: {} };"
+                "Object.defineProperty(navigator, 'languages', {get: () => ['ru-RU','ru','en-US','en']});"
+                "Object.defineProperty(navigator, 'plugins', {get: () => [1,2,3,4,5]});"
+                "Object.defineProperty(navigator, 'platform', {get: () => 'Win32'});"
+            )
+        except Exception:
+            pass
+    except Exception:
+        pass
 
 
 # =========================
@@ -333,6 +392,55 @@ class ProjectManagerRunner:
         days = (yesterday - start).days + 1
         return [start + dt.timedelta(days=i) for i in range(days)]
 
+    def _parse_date(self, s: str) -> Optional[dt.date]:
+        s = (s or "").strip()
+        today = dt.date.today()
+        if not s:
+            return today - dt.timedelta(days=1)
+        if s.isdigit():
+            if len(s) <= 2:
+                try:
+                    return dt.date(today.year, today.month, int(s))
+                except Exception:
+                    return None
+            if len(s) == 8:
+                try:
+                    return dt.datetime.strptime(s, "%d%m%Y").date()
+                except Exception:
+                    return None
+        for fmt in ("%d.%m.%Y", "%d-%m-%Y", "%Y-%m-%d"):
+            try:
+                return dt.datetime.strptime(s, fmt).date()
+            except Exception:
+                continue
+        return None
+
+    def prompt_dates(self) -> List[dt.date]:
+        while True:
+            try:
+                start_raw = input("[INPUT] Начальная дата (ДД.ММ.ГГГГ): ").strip()
+            except EOFError:
+                start_raw = ""
+            start = self._parse_date(start_raw)
+            if not start:
+                print("[INPUT] Некорректная дата. Пример: 01.09.2025")
+                continue
+
+            try:
+                end_raw = input("[INPUT] Конечная дата (ДД.ММ.ГГГГ): ").strip()
+            except EOFError:
+                end_raw = ""
+            end = self._parse_date(end_raw)
+            if not end:
+                print("[INPUT] Некорректная дата. Пример: 30.09.2025")
+                continue
+
+            if end < start:
+                print("[INPUT] Конечная дата раньше начальной — поменял местами.")
+                start, end = end, start
+            days = (end - start).days + 1
+            return [start + dt.timedelta(days=i) for i in range(days)]
+
     def set_period_dates(self, d: dt.date) -> None:
         # For Project Manager: set StartDate/EndDate directly and dispatch events
         start_s = d.strftime("%d.%m.%Y")
@@ -433,12 +541,11 @@ class ProjectManagerRunner:
         cities = self.get_cities()
         print(f"[CITIES] Найдено: {len(cities)} — {', '.join([c[0] for c in cities])}")
 
-        dates = self.compute_dates()
-        print(
-            f"[DATES] Диапазон: {dates[0]:%d.%m.%Y} — {dates[-1]:%d.%m.%Y} (всего {len(dates)})"
-            if dates
-            else "[DATES] Сегодня 1-е — диапазон пуст"
-        )
+        dates = self.prompt_dates()
+        if dates:
+            print(f"[DATES] Диапазон: {dates[0]:%d.%m.%Y} — {dates[-1]:%d.%m.%Y} (всего {len(dates)})")
+        else:
+            print("[DATES] Диапазон дат пуст — ничего обрабатывать.")
 
         self.reset_csv()
 
@@ -505,7 +612,7 @@ class ProjectManagerRunner:
 
 def main() -> int:
     # Env/config
-    user_data_dir = Path(os.environ.get("USER_DATA_DIR", "/profile"))
+    user_data_dir = Path(os.environ.get("USER_DATA_DIR") or (Path.cwd() / "profile"))
     user_data_dir.mkdir(parents=True, exist_ok=True)
 
     headless = env_bool("HEADLESS", True)
