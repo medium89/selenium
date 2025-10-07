@@ -261,7 +261,7 @@ class AnalyticsSpy:
         # Extra pause to ensure filters/widgets fully load before dump
         time.sleep(5)
         html = self.driver.page_source or ""
-        out_path = os.path.join(os.getcwd(), "spizdil.html")
+        out_path = os.path.join(os.getcwd(), "parsing.html")
         with open(out_path, "w", encoding="utf-8") as f:
             f.write(html)
         print(f"[dump] Сохранено: {out_path} ({len(html)} символов)")

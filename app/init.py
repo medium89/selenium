@@ -9,7 +9,7 @@ SCRIPTS = {
     "2": ("ProjectManager — Debiting/PrepareExcelReport (итоги → reports/project.csv)", "ProjectManager.py"),
     "3": ("RevisiaMetrics — LossesAndExcees (Статистика/ревизии → reports/revisia.csv)", "RevisiaMetrics.py"),
     "4": ("OpenSelectRole — просто открыть выбор роли", "OpenSelectRole.py"),
-    "5": ("AnalyticsSpy — сохранить HTML отчёта в spizdil.html", "AnalyticsSpy.py"),
+    "5": ("AnalyticsSpy — сохранить HTML отчёта в parsing.html", "AnalyticsSpy.py"),
     "6": ("AnalyticsLostRevenue — собрать ‘Доля упущенной выручки’ по городам", "AnalyticsLostRevenue.py"),
     "7": (
         "AnalyticsKeyMetrics — собрать 'Доля упущенной выручки по стопам пиццерии' (Итого)",

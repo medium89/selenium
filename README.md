@@ -8,7 +8,7 @@ Selenium-скрипты и запуск через .venv
 - `app/RevisiaMetrics.py`: LossesAndExcees/«Статистика» с перебором ревизий → `reports/revisia.csv`.
 - `app/OpenSelectRole.py`: открывает страницу SelectRole и печатает доступные роли (GUI по умолчанию, окно не закрывает).
 - `app/init.py`: консольное меню выбора и запуска одного из скриптов.
-- `app/AnalyticsSpy.py`: сохраняет HTML страницы отчёта «Бизнес‑обзор/Аналитика» в `spizdil.html` (для отладки селекторов).
+- `app/AnalyticsSpy.py`: сохраняет HTML страницы отчёта «Бизнес‑обзор/Аналитика» в `parsing.html` (для отладки селекторов).
 - `app/AnalyticsLostRevenue.py`: собирает метрику «Доля упущенной выручки» по всем городам → `reports/lost_revenue.csv`.
 
 Подготовка .venv
@@ -28,7 +28,7 @@ Selenium-скрипты и запуск через .venv
 - `python app/OpenSelectRole.py` — открыть SelectRole (GUI, окно не закрывается)
 - `python app/init.py` — меню выбора скрипта
 — Дополнительно:
-- `python app/AnalyticsSpy.py` — сохранить HTML отчёта в `spizdil.html`
+- `python app/AnalyticsSpy.py` — сохранить HTML отчёта в `parsing.html`
 - `python app/AnalyticsLostRevenue.py` — собрать «Доля упущенной выручки» по всем городам
 
 Дефолты, зашитые в скриптах
@@ -55,7 +55,7 @@ Chrome с GUI и без
 CSV — UTF‑8 с BOM, разделитель `;`.
 
 Analytics: метрика «Доля упущенной выручки»
-- Сохранить HTML дашборда для отладки: `python app/AnalyticsSpy.py` (файл `spizdil.html` в корне).
+- Сохранить HTML дашборда для отладки: `python app/AnalyticsSpy.py` (файл `parsing.html` в корне).
 - Собрать метрику по всем городам: `python app/AnalyticsLostRevenue.py` (CSV: `reports/lost_revenue.csv`).
 - Если фильтры не применяются в headless, откройте Chrome с окном и портом: `chromium --user-data-dir="$PWD/profile" --remote-debugging-port=9225 about:blank`, затем запустите скрипт — он подключится к открытому окну.
 
