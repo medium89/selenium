@@ -19,4 +19,5 @@ dist/
 
 ./reports/
 ./logs/
+./profile/
 config/api

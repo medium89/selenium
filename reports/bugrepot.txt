@@ -1,0 +1,90 @@
+[2025-10-18 11:26:32] Кореновск / Кореновск-1 — ERROR (total rows: 6) — 0 rows
+stderr: Ошибка отправки в Supabase: 'LossesAndExcessReporter' object has no attribute '_parse_number'
+
+[2025-10-18 11:26:53] Тимашевск / Тимашевск-1 — ERROR (total rows: 6) — 0 rows
+stderr: Ошибка отправки в Supabase: 'LossesAndExcessReporter' object has no attribute '_parse_number'
+
+[2025-10-18 11:29:40] Абинск / Абинск-1 — chunk 1/1 (total rows: 6) — 6 rows
+{"code":"42P10","details":null,"hint":null,"message":"there is no unique or exclusion constraint matching the ON CONFLICT specification"}
+stderr: % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+100  1646    0     0  100  1646      0   1051  0:00:01  0:00:01 --:--:--  1051
+100  1783    0   137  100  1646     83   1004  0:00:01  0:00:01 --:--:--  1087
+
+[2025-10-18 11:30:50] Кореновск / Кореновск-1 — chunk 1/1 (total rows: 12) — 12 rows
+{"code":"42P10","details":null,"hint":null,"message":"there is no unique or exclusion constraint matching the ON CONFLICT specification"}
+stderr: % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+100  3568    0   137  100  3431    151   3786 --:--:-- --:--:-- --:--:--  3933
+
+[2025-10-18 11:31:25] Ставрополь / Ставрополь-2 — chunk 1/1 (total rows: 6) — 6 rows
+{"code":"42P10","details":null,"hint":null,"message":"there is no unique or exclusion constraint matching the ON CONFLICT specification"}
+stderr: % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+100  1859    0   137  100  1722    222   2792 --:--:-- --:--:-- --:--:--  3012
+
+[2025-10-18 11:31:27] Ставрополь / Ставрополь-3 — chunk 1/1 (total rows: 6) — 6 rows
+{"code":"42P10","details":null,"hint":null,"message":"there is no unique or exclusion constraint matching the ON CONFLICT specification"}
+stderr: % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+100  1722    0     0  100  1722      0   4085 --:--:-- --:--:-- --:--:--  4080
+100  1859    0   137  100  1722    181   2287 --:--:-- --:--:-- --:--:--  2468
+
+[2025-10-18 11:31:30] Ставрополь / Ставрополь-4 — chunk 1/1 (total rows: 6) — 6 rows
+{"code":"42P10","details":null,"hint":null,"message":"there is no unique or exclusion constraint matching the ON CONFLICT specification"}
+stderr: % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+100  1720    0     0  100  1720      0   4133 --:--:-- --:--:-- --:--:--  4134
+100  1857    0   137  100  1720    179   2247 --:--:-- --:--:-- --:--:--  2424
+
+[2025-10-18 11:31:33] Ставрополь / Ставрополь-5 — chunk 1/1 (total rows: 6) — 6 rows
+{"code":"42P10","details":null,"hint":null,"message":"there is no unique or exclusion constraint matching the ON CONFLICT specification"}
+stderr: % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+100  1859    0   137  100  1722    234   2944 --:--:-- --:--:-- --:--:--  3177
+
+[2025-10-18 11:46:04] Кореновск / Кореновск-1 — chunk 1/1 (total rows: 6) — 6 rows
+[{"id":1,"city":"Кореновск","department":"Кореновск-1","dt":"2025-10-17","revisions":"firstRevisionId:30.09.2025 10:14 (Месяц), secondRevisionId:18.10.2025 01:03 (Месяц)","metric_name":"Итого потери","percent_value":0.0,"amount_value":0.0,"created_at":"2025-10-18T04:46:04.394266+00:00","updated_at":"2025-10-18T04:46:04.394266+00:00"}, 
+ {"id":2,"city":"Кореновск","department":"Кореновск-1","dt":"2025-10-17","revisions":"firstRevisionId:30.09.2025 10:14 (Месяц), secondRevisionId:18.10.2025 01:03 (Месяц)","metric_name":"Неучтённые потери","percent_value":0.0,"amount_value":0.0,"created_at":"2025-10-18T04:46:04.394266+00:00","updated_at":"2025-10-18T04:46:04.394266+00:00"}, 
+ {"id":3,"city":"Кореновск","department":"Кореновск-1","dt":"2025-10-17","revisions":"firstRevisionId:30.09.2025 10:14 (Месяц), secondRevisionId:18.10.2025 01:03 (Месяц)","metric_name":"Списания","percent_value":0.0,"amount_value":0.0,"created_at":"2025-10-18T04:46:04.394266+00:00","updated_at":"2025-10-18T04:46:04.394266+00:00"}, 
+ {"id":4,"city":"Кореновск","department":"Кореновск-1","dt":"2025-10-17","revisions":"firstRevisionId:30.09.2025 10:14 (Месяц), secondRevisionId:18.10.2025 01:03 (Месяц)","metric_name":"Брак","percent_value":0.0,"amount_value":0.0,"created_at":"2025-10-18T04:46:04.394266+00:00","updated_at":"2025-10-18T04:46:04.394266+00:00"}, 
+ {"id":5,"city":"Кореновск","department":"Кореновск-1","dt":"2025-10-17","revisions":"firstRevisionId:30.09.2025 10:14 (Месяц), secondRevisionId:18.10.2025 01:03 (Месяц)","metric_name":"Отказы","percent_value":0.0,"amount_value":0.0,"created_at":"2025-10-18T04:46:04.394266+00:00","updated_at":"2025-10-18T04:46:04.394266+00:00"}, 
+ {"id":6,"city":"Кореновск","department":"Кореновск-1","dt":"2025-10-17","revisions":"firstRevisionId:30.09.2025 10:14 (Месяц), secondRevisionId:18.10.2025 01:03 (Месяц)","metric_name":"Итого избыток","percent_value":0.0,"amount_value":0.0,"created_at":"2025-10-18T04:46:04.394266+00:00","updated_at":"2025-10-18T04:46:04.394266+00:00"}]
+[SUPABASE] Повтор без on_conflict из-за отсутствия уникального индекса.
+
+[2025-10-18 11:46:25] Тимашевск / Тимашевск-1 — chunk 1/1 (total rows: 6) — 6 rows
+[{"id":7,"city":"Тимашевск","department":"Тимашевск-1","dt":"2025-10-17","revisions":"firstRevisionId:30.09.2025 00:22 (Неделя), secondRevisionId:14.10.2025 23:31 (День)","metric_name":"Итого потери","percent_value":0.79,"amount_value":16956.68,"created_at":"2025-10-18T04:46:26.845838+00:00","updated_at":"2025-10-18T04:46:26.845838+00:00"}, 
+ {"id":8,"city":"Тимашевск","department":"Тимашевск-1","dt":"2025-10-17","revisions":"firstRevisionId:30.09.2025 00:22 (Неделя), secondRevisionId:14.10.2025 23:31 (День)","metric_name":"Неучтённые потери","percent_value":0.19,"amount_value":3993.61,"created_at":"2025-10-18T04:46:26.845838+00:00","updated_at":"2025-10-18T04:46:26.845838+00:00"}, 
+ {"id":9,"city":"Тимашевск","department":"Тимашевск-1","dt":"2025-10-17","revisions":"firstRevisionId:30.09.2025 00:22 (Неделя), secondRevisionId:14.10.2025 23:31 (День)","metric_name":"Списания","percent_value":0.5,"amount_value":10719.85,"created_at":"2025-10-18T04:46:26.845838+00:00","updated_at":"2025-10-18T04:46:26.845838+00:00"}, 
+ {"id":10,"city":"Тимашевск","department":"Тимашевск-1","dt":"2025-10-17","revisions":"firstRevisionId:30.09.2025 00:22 (Неделя), secondRevisionId:14.10.2025 23:31 (День)","metric_name":"Брак","percent_value":0.03,"amount_value":592.55,"created_at":"2025-10-18T04:46:26.845838+00:00","updated_at":"2025-10-18T04:46:26.845838+00:00"}, 
+ {"id":11,"city":"Тимашевск","department":"Тимашевск-1","dt":"2025-10-17","revisions":"firstRevisionId:30.09.2025 00:22 (Неделя), secondRevisionId:14.10.2025 23:31 (День)","metric_name":"Отказы","percent_value":0.08,"amount_value":1650.67,"created_at":"2025-10-18T04:46:26.845838+00:00","updated_at":"2025-10-18T04:46:26.845838+00:00"}, 
+ {"id":12,"city":"Тимашевск","department":"Тимашевск-1","dt":"2025-10-17","revisions":"firstRevisionId:30.09.2025 00:22 (Неделя), secondRevisionId:14.10.2025 23:31 (День)","metric_name":"Итого избыток","percent_value":0.19,"amount_value":4073.03,"created_at":"2025-10-18T04:46:26.845838+00:00","updated_at":"2025-10-18T04:46:26.845838+00:00"}]
+
+[2025-10-18 12:26:19] AnalyticsLostRevenue — chunk 1/1 (rows: 9) — 9 rows
+[{"id":1,"city":"Абинск","department":"Абинск","report_date":"2025-10-18","lost_share":0.5,"created_at":"2025-10-18T05:26:21.613592+00:00","updated_at":"2025-10-18T05:26:21.613592+00:00"}, 
+ {"id":2,"city":"Кореновск","department":"Кореновск","report_date":"2025-10-18","lost_share":1.47,"created_at":"2025-10-18T05:26:21.613592+00:00","updated_at":"2025-10-18T05:26:21.613592+00:00"}, 
+ {"id":3,"city":"Ставрополь","department":"Ставрополь-1","report_date":"2025-10-18","lost_share":1.96,"created_at":"2025-10-18T05:26:21.613592+00:00","updated_at":"2025-10-18T05:26:21.613592+00:00"}, 
+ {"id":4,"city":"Ставрополь","department":"Ставрополь-2","report_date":"2025-10-18","lost_share":0.3,"created_at":"2025-10-18T05:26:21.613592+00:00","updated_at":"2025-10-18T05:26:21.613592+00:00"}, 
+ {"id":5,"city":"Ставрополь","department":"Ставрополь-3","report_date":"2025-10-18","lost_share":1.29,"created_at":"2025-10-18T05:26:21.613592+00:00","updated_at":"2025-10-18T05:26:21.613592+00:00"}, 
+ {"id":6,"city":"Ставрополь","department":"Ставрополь-4","report_date":"2025-10-18","lost_share":0.77,"created_at":"2025-10-18T05:26:21.613592+00:00","updated_at":"2025-10-18T05:26:21.613592+00:00"}, 
+ {"id":7,"city":"Ставрополь","department":"Ставрополь-5","report_date":"2025-10-18","lost_share":0.0,"created_at":"2025-10-18T05:26:21.613592+00:00","updated_at":"2025-10-18T05:26:21.613592+00:00"}, 
+ {"id":8,"city":"Ставрополь","department":"Ставрополь-7","report_date":"2025-10-18","lost_share":0.0,"created_at":"2025-10-18T05:26:21.613592+00:00","updated_at":"2025-10-18T05:26:21.613592+00:00"}, 
+ {"id":9,"city":"Тимашевск","department":"Тимашевск","report_date":"2025-10-18","lost_share":0.0,"created_at":"2025-10-18T05:26:21.613592+00:00","updated_at":"2025-10-18T05:26:21.613592+00:00"}]
+[SUPABASE] Повтор без on_conflict из-за отсутствия уникального индекса.
+
