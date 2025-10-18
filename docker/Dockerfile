@@ -27,5 +27,5 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 # Copy project files
 COPY . /app
 
-# Default to office_manager; override CMD to run project_manager if needed
-CMD ["dumb-init", "python", "app/OfficeManager.py"]
+# Default to material_consumption_report; override CMD to run write_off report if needed
+CMD ["dumb-init", "python", "app/MaterialConsumptionReport.py"]

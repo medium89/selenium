@@ -19,4 +19,4 @@ dist/
 
 ./reports/
 ./logs/
-pizdec.txt
+config/api

@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import csv
 import datetime as dt
+import json
 import os
+import subprocess
 import time
-from typing import List, Optional, Tuple
+import urllib.parse
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 from selenium import webdriver
 from selenium.common.exceptions import SessionNotCreatedException
@@ -30,9 +34,324 @@ ANALYTICS_URL = (
 )
 ROLE_ID = os.environ.get("ROLE_ID", "7")  # Менеджер проектов
 
-CSV_FILE = os.environ.get("LOST_REVENUE_CSV", "reports/lost_revenue.csv")
+CSV_FILE = os.environ.get("LOST_REVENUE_CSV", "reports/AnalyticsLostRevenue.csv")
 STEALTH = os.environ.get("STEALTH", "1")
 PORT = int(os.environ.get("PORT", "9225"))
+BUGREPORT_FILE = Path("reports/bugrepot.txt")
+SUPABASE_CONFIG_FILE = Path(os.environ.get("SUPABASE_CONFIG_FILE", "config/api"))
+SUPABASE_KEY_FILE = Path(os.environ.get("SUPABASE_KEY_FILE", "config/api.key"))
+
+
+def log_bugreport(context: str, count: int, stdout: str, stderr: str) -> None:
+    try:
+        BUGREPORT_FILE.parent.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+    try:
+        timestamp = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with BUGREPORT_FILE.open("a", encoding="utf-8") as f:
+            f.write(f"[{timestamp}] {context} — {count} rows\n")
+            if stdout:
+                f.write(stdout.strip() + "\n")
+            if stderr:
+                f.write(f"stderr: {stderr.strip()}\n")
+            f.write("\n")
+    except Exception as exc:
+        print(f"[BUGLOG] Не удалось записать ответ БД: {exc}")
+
+
+class SupabaseWriter:
+    def __init__(self) -> None:
+        config_url, config_key = self._read_supabase_config()
+        project_id = os.environ.get("SUPABASE_PROJECT_ID", "").strip()
+        self.supabase_url = (os.environ.get("SUPABASE_URL") or "").strip()
+        if not self.supabase_url and config_url:
+            self.supabase_url = config_url
+        if not self.supabase_url and project_id:
+            self.supabase_url = f"https://{project_id}.supabase.co"
+        self.supabase_key = (
+            os.environ.get("SUPABASE_SERVICE_KEY")
+            or os.environ.get("SUPABASE_KEY")
+            or ""
+        ).strip()
+        if not self.supabase_key:
+            self.supabase_key = config_key
+        if not self.supabase_key:
+            self.supabase_key = self._read_supabase_key_file()
+        self.supabase_table = os.environ.get("SUPABASE_TABLE", "analytics_lost_revenue").strip() or "analytics_lost_revenue"
+        self.supabase_on_conflict = os.environ.get(
+            "SUPABASE_ON_CONFLICT", "city,department,report_date"
+        ).strip()
+        self.supabase_batch_size = max(1, int(os.environ.get("SUPABASE_BATCH_SIZE", "50")))
+        self.supabase_timeout = float(os.environ.get("SUPABASE_TIMEOUT", "15"))
+        self.supabase_enabled = bool(self.supabase_url and self.supabase_key)
+        self._supabase_warned = False
+        self._supabase_conflict_forced_off = False
+        self._supabase_conflict_notice_shown = False
+        default_field_map = {
+            "city": os.environ.get("SUPABASE_FIELD_CITY", "city"),
+            "department": os.environ.get("SUPABASE_FIELD_DEPARTMENT", "department"),
+            "date": os.environ.get("SUPABASE_FIELD_DATE", "report_date"),
+            "value": os.environ.get("SUPABASE_FIELD_VALUE", "lost_share"),
+        }
+        field_map_override = os.environ.get("SUPABASE_FIELD_MAP", "").strip()
+        if field_map_override:
+            try:
+                parsed_map = json.loads(field_map_override)
+                if isinstance(parsed_map, dict):
+                    default_field_map.update(
+                        {k: str(v) for k, v in parsed_map.items() if v}
+                    )
+            except json.JSONDecodeError:
+                print(
+                    "[SUPABASE] Не удалось разобрать SUPABASE_FIELD_MAP как JSON — использую значения по умолчанию."
+                )
+        self.supabase_field_map = default_field_map
+        self._buffer: List[Dict[str, str]] = []
+
+    # -------- queue / flush --------
+    def queue(self, city: str, department: str, date_str: str, value_text: str) -> None:
+        if not self.supabase_enabled:
+            if not self._supabase_warned:
+                print("[SUPABASE] URL или ключ не заданы — пропускаю отправку.")
+                self._supabase_warned = True
+            return
+        self._buffer.append(
+            {
+                "city": city,
+                "department": department,
+                "date": date_str,
+                "value": value_text,
+            }
+        )
+        if len(self._buffer) >= self.supabase_batch_size:
+            self.flush()
+
+    def flush(self) -> None:
+        if not self._buffer or not self.supabase_enabled:
+            self._buffer.clear()
+            return
+        rows = [
+            [item["city"], item["department"], item["date"], item["value"]]
+            for item in self._buffer
+        ]
+        total_rows = len(rows)
+        self._buffer.clear()
+        try:
+            responses = self._push_supabase_rows(rows)
+        except Exception as exc:
+            error_text = f"Ошибка отправки в Supabase: {exc}"
+            print(f"[SUPABASE] {error_text}")
+            log_bugreport(
+                f"AnalyticsLostRevenue — ERROR (rows: {total_rows})", 0, "", error_text
+            )
+            return
+        for idx, resp in enumerate(responses, start=1):
+            context = f"AnalyticsLostRevenue — chunk {idx}/{len(responses)} (rows: {total_rows})"
+            log_bugreport(
+                context,
+                int(resp.get("count", 0)),
+                str(resp.get("stdout", "")),
+                str(resp.get("stderr", "")),
+            )
+
+    # -------- helpers --------
+    def _read_supabase_config(self) -> Tuple[str, str]:
+        try:
+            if not SUPABASE_CONFIG_FILE.is_file():
+                return "", ""
+            raw = SUPABASE_CONFIG_FILE.read_text(encoding="utf-8").strip()
+            if not raw:
+                return "", ""
+            data: Dict[str, Any] = {}
+            if raw.lstrip().startswith("{"):
+                data_loaded = json.loads(raw)
+                if isinstance(data_loaded, dict):
+                    data = data_loaded
+                else:
+                    print(f"[SUPABASE] Ожидал объект JSON в {SUPABASE_CONFIG_FILE}")
+                    return "", ""
+            else:
+                for line in raw.splitlines():
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    if "=" in line:
+                        key, value = line.split("=", 1)
+                        data[key.strip().lower()] = value.strip()
+            url = str(data.get("url", "")).strip()
+            key = ""
+            for candidate in ("key", "apikey", "anon_key", "service_key"):
+                if candidate in data and data[candidate]:
+                    key = str(data[candidate]).strip()
+                    break
+            if not key:
+                for candidate_name, candidate_value in data.items():
+                    if "key" in candidate_name and candidate_value:
+                        key = str(candidate_value).strip()
+                        break
+            return url, key
+        except Exception as exc:
+            print(f"[SUPABASE] Не удалось прочитать {SUPABASE_CONFIG_FILE}: {exc}")
+            return "", ""
+
+    def _read_supabase_key_file(self) -> str:
+        try:
+            if SUPABASE_KEY_FILE.is_file():
+                value = SUPABASE_KEY_FILE.read_text(encoding="utf-8").strip()
+                if value:
+                    return value
+        except Exception as exc:
+            print(f"[SUPABASE] Не удалось прочитать ключ из {SUPABASE_KEY_FILE}: {exc}")
+        return ""
+
+    def _push_supabase_rows(self, rows: List[List[str]]) -> List[Dict[str, Any]]:
+        payload: List[dict] = []
+        for row in rows:
+            record = self._build_supabase_record(row)
+            if record is not None:
+                payload.append(record)
+        if not payload:
+            return []
+        responses: List[Dict[str, Any]] = []
+        for chunk_start in range(0, len(payload), self.supabase_batch_size):
+            chunk = payload[chunk_start : chunk_start + self.supabase_batch_size]
+            responses.append(self._post_supabase_chunk(chunk))
+        return responses
+
+    def _build_supabase_record(self, row: List[str]) -> Optional[dict]:
+        if len(row) < 4:
+            return None
+        city, dept, date_str, value_text = row[:4]
+        fm = self.supabase_field_map
+        return {
+            fm["city"]: city,
+            fm["department"]: dept,
+            fm["date"]: self._safe_parse_date(date_str),
+            fm["value"]: self._parse_number(value_text),
+        }
+
+    def _parse_number(self, value: str) -> Optional[float]:
+        txt = (value or "").strip()
+        if not txt:
+            return None
+        txt = txt.replace("%", "").replace("\xa0", "").replace(" ", "")
+        txt = txt.replace(",", ".")
+        try:
+            return float(txt)
+        except ValueError:
+            return None
+
+    def _safe_parse_date(self, value: str) -> str:
+        txt = (value or "").strip()
+        for fmt in ("%d.%m.%Y", "%Y-%m-%d"):
+            try:
+                return dt.datetime.strptime(txt, fmt).date().isoformat()
+            except Exception:
+                continue
+        return txt
+
+    def _post_supabase_chunk(
+        self, chunk: List[dict], allow_conflict: bool = True
+    ) -> Dict[str, Any]:
+        if not chunk:
+            return {
+                "count": 0,
+                "stdout": "",
+                "stderr": "",
+                "endpoint": "",
+                "http_status": 0,
+                "on_conflict": False,
+            }
+        use_conflict = (
+            allow_conflict
+            and bool(self.supabase_on_conflict)
+            and not self._supabase_conflict_forced_off
+        )
+        base_url = self.supabase_url.rstrip("/")
+        endpoint = f"{base_url}/rest/v1/{self.supabase_table}"
+        params: Dict[str, str] = {}
+        if use_conflict:
+            params["on_conflict"] = self.supabase_on_conflict
+        if params:
+            endpoint = f"{endpoint}?{urllib.parse.urlencode(params)}"
+        prefer_parts = ["return=representation"]
+        if use_conflict:
+            prefer_parts.append("resolution=merge-duplicates")
+        data = json.dumps(chunk, ensure_ascii=False)
+        cmd = ["curl", "-sS"]
+        if self.supabase_timeout > 0:
+            cmd.extend(["--max-time", str(self.supabase_timeout)])
+        cmd.extend(
+            [
+                "-w",
+                "HTTPSTATUS:%{http_code}",
+                "-X",
+                "POST",
+                endpoint,
+                "-H",
+                f"apikey: {self.supabase_key}",
+                "-H",
+                f"Authorization: Bearer {self.supabase_key}",
+                "-H",
+                "Content-Type: application/json",
+                "-H",
+                f"Prefer: {','.join(dict.fromkeys(prefer_parts))}",
+                "-d",
+                data,
+            ]
+        )
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        stdout_raw = result.stdout or ""
+        stderr_txt = (result.stderr or "").strip()
+        http_status = 0
+        body_txt = stdout_raw
+        if "HTTPSTATUS:" in stdout_raw:
+            body_txt, _, status_part = stdout_raw.rpartition("HTTPSTATUS:")
+            try:
+                http_status = int((status_part or "").strip() or "0")
+            except ValueError:
+                http_status = 0
+        body_txt = body_txt.strip()
+        if result.returncode != 0 and http_status == 0:
+            raise RuntimeError(f"curl exit code {result.returncode}: {stderr_txt or stdout_raw}")
+        if http_status >= 400:
+            error_payload = body_txt or stderr_txt
+            conflict_missing = False
+            if use_conflict:
+                lowered = (error_payload or "").lower()
+                conflict_missing = "no unique or exclusion constraint" in lowered
+                if not conflict_missing:
+                    try:
+                        parsed = json.loads(body_txt or "{}")
+                        message = str(parsed.get("message", "")).lower()
+                        conflict_missing = "no unique or exclusion constraint" in message
+                    except Exception:
+                        pass
+            if use_conflict and conflict_missing:
+                if not self._supabase_conflict_notice_shown:
+                    print("[SUPABASE] У таблицы нет уникального индекса для on_conflict — повторяю без него.")
+                    self._supabase_conflict_notice_shown = True
+                self._supabase_conflict_forced_off = True
+                retry_info = self._post_supabase_chunk(chunk, allow_conflict=False)
+                extra_msg = "[SUPABASE] Повтор без on_conflict из-за отсутствия уникального индекса."
+                prev_stdout = (retry_info.get("stdout") or "").strip()
+                retry_info["stdout"] = (
+                    f"{prev_stdout}\n{extra_msg}".strip() if prev_stdout else extra_msg
+                )
+                return retry_info
+            raise RuntimeError(
+                f"Supabase HTTP {http_status}: {error_payload or 'unknown error'}"
+            )
+        print(f"[SUPABASE] Записано {len(chunk)} записей.")
+        return {
+            "count": len(chunk),
+            "stdout": body_txt,
+            "stderr": stderr_txt,
+            "endpoint": endpoint,
+            "http_status": http_status,
+            "on_conflict": use_conflict,
+        }
 
 
 def highlight(driver: webdriver.Chrome, el) -> None:
@@ -355,8 +674,29 @@ def write_csv_row(path: str, row: List[str]) -> None:
     with open(path, "a", encoding="utf-8-sig", newline="") as f:
         w = csv.writer(f, delimiter=";")
         if not exists:
-            w.writerow(["Город", "Дата", "Доля упущенной выручки"])
+            w.writerow(["Пиццерия/Город", "Дата", "Доля упущенной выручки"])
         w.writerow(row)
+
+
+def record_result(
+    supabase: Optional[SupabaseWriter],
+    city: str,
+    department: str,
+    date_str: str,
+    value_text: Optional[str],
+    error: Optional[Exception] = None,
+) -> None:
+    display_value = "(нет данных)"
+    if error is not None:
+        display_value = f"ОШИБКА: {error}"
+    else:
+        value_clean = (value_text or "").strip()
+        if value_clean:
+            display_value = value_clean
+    write_csv_row(CSV_FILE, [department, date_str, display_value])
+    if supabase is None or error is not None:
+        return
+    supabase.queue(city, department, date_str, value_text or "")
 
 
 
@@ -372,10 +712,10 @@ def _wait_port(port: int, timeout: int = 10) -> bool:
 
 
 def main() -> int:
+    supabase = SupabaseWriter()
     driver = build_driver()
     wait = WebDriverWait(driver, 25)
     try:
-        # Get all cities, iterate
         cities = get_cities(driver, wait)
         today = dt.date.today().strftime("%d.%m.%Y")
         print(f"[CITIES] Найдено: {len(cities)} — {', '.join([c[0] for c in cities])}")
@@ -385,26 +725,21 @@ def main() -> int:
             try:
                 select_city(driver, wait, city_uuid)
                 goto_analytics(driver, wait)
-                # Wait base readiness
                 try:
                     WebDriverWait(driver, 30).until(
                         lambda d: d.execute_script("return document.readyState") == "complete"
                     )
                 except Exception:
                     pass
-                # Ensure we're still on analytics before opening filters
                 try:
                     ensure_on_analytics_or_retry(driver, wait, retries=2)
                 except Exception:
-                    # One more forced attempt
                     goto_analytics(driver, wait)
                     ensure_on_analytics_or_retry(driver, wait, retries=1)
 
                 prev_metric_city: Optional[str] = None
-                # Попытка применить фильтры (Страна=Россия; Пиццерии=по городу)
                 try:
                     open_filter_panel(driver)
-                    # Ждём полной готовности панели: селекты отрендерены, спиннеры/скелетоны скрыты
                     wait_filters_loaded(driver, wait, timeout=30)
                     set_country_russia_only(driver)
                     city_key = (city_name or "").strip().lower()
@@ -427,12 +762,27 @@ def main() -> int:
                                 prev_metric_branch = read_lost_revenue(driver)
                                 apply_filters(driver)
                                 print(f"[FILTER] Применены фильтры для {branch_name}")
-                                branch_val = wait_lost_revenue_update(driver, previous=prev_metric_branch)
-                                write_csv_row(CSV_FILE, [branch_name, today, branch_val or "(нет данных)"])
+                                branch_val = wait_lost_revenue_update(
+                                    driver, previous=prev_metric_branch
+                                )
+                                record_result(
+                                    supabase,
+                                    city_name,
+                                    branch_name,
+                                    today,
+                                    branch_val,
+                                )
                                 print(f"[CSV] {branch_name}: {branch_val}")
                             except Exception as branch_err:
                                 print(f"[WARN] Ошибка в пиццерии {branch_name}: {branch_err}")
-                                write_csv_row(CSV_FILE, [branch_name, today, f"ОШИБКА: {branch_err}"])
+                                record_result(
+                                    supabase,
+                                    city_name,
+                                    branch_name,
+                                    today,
+                                    None,
+                                    error=branch_err,
+                                )
                         continue
 
                     set_pizzerias_for_city(driver, city_name)
@@ -442,16 +792,33 @@ def main() -> int:
                 except Exception as e:
                     print(f"[filters] Не удалось применить фильтры: {e}")
                 val = wait_lost_revenue_update(driver, previous=prev_metric_city)
-                write_csv_row(CSV_FILE, [city_name, today, val or "(нет данных)"])
+                record_result(
+                    supabase,
+                    city_name,
+                    city_name,
+                    today,
+                    val,
+                )
                 print(f"[CSV] {city_name}: {val}")
             except Exception as e:
                 print(f"[WARN] Ошибка в городе {city_name}: {e}")
-                write_csv_row(CSV_FILE, [city_name, today, f"ОШИБКА: {e}"])
+                record_result(
+                    supabase,
+                    city_name,
+                    city_name,
+                    today,
+                    None,
+                    error=e,
+                )
     finally:
         try:
             driver.quit()
         except Exception:
             pass
+        try:
+            supabase.flush()
+        except Exception as flush_err:
+            print(f"[SUPABASE] Ошибка при финальном flush: {flush_err}")
     print(f"[DONE] Готово! Файл {CSV_FILE} сохранён.")
     return 0
 

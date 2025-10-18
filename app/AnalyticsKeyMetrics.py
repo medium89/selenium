@@ -37,7 +37,7 @@ TABLE_SELECTOR = os.environ.get(
     "KEY_METRIC_TABLE_SELECTOR",
     "table.table.table-striped.table-condensed, table.table-striped.table-condensed",
 )
-CSV_FILE = os.environ.get("KEY_METRIC_CSV", "reports/key_metric_totals.csv")
+CSV_FILE = os.environ.get("KEY_METRIC_CSV", "reports/AnalyticsKeyMetrics.csv")
 
 
 def clear_pizzeria_filter(driver: webdriver.Chrome) -> None:

@@ -1,3 +1,18 @@
-2025/10/07-23:41:14.775 27ae Reusing MANIFEST /mnt/e/_Server/_newserver/OSPanel/domains/selenium/profile/Default/Local Storage/leveldb/MANIFEST-000001
-2025/10/07-23:41:14.884 27ae Recovering log #431
-2025/10/07-23:41:14.887 27ae Reusing old log /mnt/e/_Server/_newserver/OSPanel/domains/selenium/profile/Default/Local Storage/leveldb/000431.log 
+2025/10/18-12:14:28.829 1b9a Reusing MANIFEST /mnt/e/_Server/_newserver/OSPanel/domains/selenium/profile/Default/Local Storage/leveldb/MANIFEST-000001
+2025/10/18-12:14:28.905 1b9a Recovering log #489
+2025/10/18-12:14:28.968 1b9a Level-0 table #492: started
+2025/10/18-12:14:29.030 1b9a Level-0 table #492: 457888 bytes OK
+2025/10/18-12:14:29.033 1b9a Recovering log #491
+2025/10/18-12:14:29.072 1b9a Level-0 table #493: started
+2025/10/18-12:14:29.116 1b9a Level-0 table #493: 458147 bytes OK
+2025/10/18-12:14:29.163 1b9a Delete type=0 #489
+2025/10/18-12:14:29.164 1b9a Delete type=0 #491
+2025/10/18-12:14:29.179 1b9c Compacting 4@0 + 1@1 files
+2025/10/18-12:14:29.410 1b9c Generated table #495@0: 20 keys, 457676 bytes
+2025/10/18-12:14:29.410 1b9c Compacted 4@0 + 1@1 files => 457676 bytes
+2025/10/18-12:14:29.466 1b9c compacted to: files[ 0 1 1 0 0 0 0 ]
+2025/10/18-12:14:29.476 1b9c Delete type=2 #486
+2025/10/18-12:14:29.477 1b9c Delete type=2 #488
+2025/10/18-12:14:29.478 1b9c Delete type=2 #490
+2025/10/18-12:14:29.479 1b9c Delete type=2 #492
+2025/10/18-12:14:29.480 1b9c Delete type=2 #493
