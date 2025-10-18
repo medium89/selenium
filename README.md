@@ -6,10 +6,10 @@ Selenium-скрипты и запуск через .venv
 - `app/MaterialConsumptionReport.py`: MaterialConsumption по городам/отделам/датам → `reports/MaterialConsumptionReport.csv`.
 - `app/MaterialWriteOffReport.py`: Debiting/PrepareExcelReport (итоги по дням) → `reports/MaterialWriteOffReport.csv`.
 - `app/LossesAndExcessReport.py`: LossesAndExcees/«Статистика» с перебором ревизий → `reports/LossesAndExcessReport.csv`.
-- `app/OpenSelectRole.py`: открывает страницу SelectRole и печатает доступные роли (GUI по умолчанию, окно не закрывает).
-- `app/init.py`: консольное меню выбора и запуска одного из скриптов.
-- `app/AnalyticsSpy.py`: сохраняет HTML страницы отчёта «Бизнес‑обзор/Аналитика» в `parsing.html` (для отладки селекторов).
-- `app/AnalyticsLostRevenue.py`: собирает метрику «Доля упущенной выручки» по всем городам → `reports/AnalyticsLostRevenue.csv`.
+- `app/AnalyticsLostRevenue.py`: «Доля упущенной выручки» по городам/пиццериям → `reports/AnalyticsLostRevenue.csv`.
+- `app/init.py`: консольное меню с пунктами «Загрузить отчёт …» и подменю «Технические скрипты».
+- `app/OpenSelectRole.py`: открывает SelectRole и печатает доступные роли (GUI по умолчанию).
+- `app/AnalyticsSpy.py`: сохраняет HTML дашборда «Analytics» в `parsing.html` для отладки селекторов.
 
 Подготовка .venv
 - Windows (PowerShell):
@@ -25,11 +25,11 @@ Selenium-скрипты и запуск через .venv
 - `python app/MaterialConsumptionReport.py`
 - `python app/MaterialWriteOffReport.py`
 - `python app/LossesAndExcessReport.py`
-- `python app/OpenSelectRole.py` — открыть SelectRole (GUI, окно не закрывается)
-- `python app/init.py` — меню выбора скрипта
+- `python app/AnalyticsLostRevenue.py`
+- `python app/init.py` — меню; отчёты перечислены как «Загрузить отчёт: …», технические утилиты лежат в подменю.
 — Дополнительно:
+- `python app/OpenSelectRole.py` — открыть SelectRole (GUI, окно не закрывается)
 - `python app/AnalyticsSpy.py` — сохранить HTML отчёта в `parsing.html`
-- `python app/AnalyticsLostRevenue.py` — собрать «Доля упущенной выручки» по всем городам
 
 Дефолты, зашитые в скриптах
 - Профиль: `USER_DATA_DIR=$PWD/profile` (создаётся, если нет).
@@ -51,8 +51,34 @@ Chrome с GUI и без
 - `reports/MaterialConsumptionReport.csv` — MaterialConsumption.
 - `reports/MaterialWriteOffReport.csv` — Debiting/PrepareExcelReport.
 - `reports/LossesAndExcessReport.csv` — LossesAndExcees/«Статистика».
-— Дополнительно: `reports/AnalyticsLostRevenue.csv` — «Доля упущенной выручки».
+- `reports/AnalyticsLostRevenue.csv` — «Доля упущенной выручки».
+- `reports/bugrepot.txt` — журнал ответов Supabase (успехи/ошибки по каждому чанку).
 CSV — UTF‑8 с BOM, разделитель `;`.
+
+Supabase и логирование
+- Все отчёты (MaterialConsumption, MaterialWriteOff, LossesAndExcess, AnalyticsLostRevenue) отправляют данные в Supabase, если заданы `SUPABASE_URL`/`SUPABASE_KEY` (или `SUPABASE_SERVICE_KEY`). Таблица по умолчанию берётся из `SUPABASE_TABLE`.
+- Конфигурацию можно положить в `config/api` (JSON или `key=value`), ключ — в `config/api.key`, либо передать переменными окружения.
+- При указании `SUPABASE_ON_CONFLICT` скрипты делают `INSERT ... on_conflict=...`. Если Supabase возвращает ошибку «no unique or exclusion constraint…», скрипт автоматически повторит запрос без on_conflict и запишет предупреждение в bugreport.
+- Полный ответ curl (stdout/stderr, размер чанка) попадает в `reports/bugrepot.txt`. Ошибки Supabase больше не теряются — проверяйте файл после выгрузки.
+- Для `AnalyticsLostRevenue.py` значения `SUPABASE_TABLE` по умолчанию `analytics_lost_revenue`, `SUPABASE_ON_CONFLICT=city,department,report_date`. Пример SQL для таблицы:
+  ```sql
+  BEGIN;
+  DROP TABLE IF EXISTS public.analytics_lost_revenue;
+  CREATE TABLE public.analytics_lost_revenue (
+      id              bigserial PRIMARY KEY,
+      city            text        NOT NULL,
+      department      text        NOT NULL,
+      report_date     date        NOT NULL,
+      lost_share      numeric,
+      created_at      timestamptz NOT NULL DEFAULT timezone('utc', now()),
+      updated_at      timestamptz NOT NULL DEFAULT timezone('utc', now())
+  );
+  CREATE INDEX analytics_lost_revenue_report_date_idx ON public.analytics_lost_revenue (report_date);
+  CREATE INDEX analytics_lost_revenue_city_idx        ON public.analytics_lost_revenue (city);
+  CREATE INDEX analytics_lost_revenue_department_idx ON public.analytics_lost_revenue (department);
+  COMMIT;
+  ```
+- Для LossesAndExcess не забудьте уникальный индекс под `SUPABASE_ON_CONFLICT` (по умолчанию `city,department,dt,revisions,metric_name`).
 
 Analytics: метрика «Доля упущенной выручки»
 - Сохранить HTML дашборда для отладки: `python app/AnalyticsSpy.py` (файл `parsing.html` в корне).

@@ -1,3 +1,6 @@
-2025/10/07-23:41:57.864 28bd Reusing MANIFEST /mnt/e/_Server/_newserver/OSPanel/domains/selenium/profile/Default/shared_proto_db/MANIFEST-000001
-2025/10/07-23:41:57.882 28bd Recovering log #7
-2025/10/07-23:41:57.886 28bd Reusing old log /mnt/e/_Server/_newserver/OSPanel/domains/selenium/profile/Default/shared_proto_db/000007.log 
+2025/10/18-12:14:44.003 1cb5 Reusing MANIFEST /mnt/e/_Server/_newserver/OSPanel/domains/selenium/profile/Default/shared_proto_db/MANIFEST-000001
+2025/10/18-12:14:44.017 1cb5 Recovering log #7
+2025/10/18-12:14:44.028 1cb5 Reusing old log /mnt/e/_Server/_newserver/OSPanel/domains/selenium/profile/Default/shared_proto_db/000007.log 
+2025/10/18-12:14:44.151 1cb5 Level-0 table #11: started
+2025/10/18-12:14:44.225 1cb5 Level-0 table #11: 109639 bytes OK
+2025/10/18-12:14:44.277 1cb5 Delete type=0 #7
