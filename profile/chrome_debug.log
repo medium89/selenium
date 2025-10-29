@@ -1,0 +1,69 @@
+[14128:14128:1019/005550.441648:WARNING:sandbox/policy/linux/sandbox_linux.cc:414] InitializeSandbox() called with multiple threads in process gpu-process.
+[14101:14101:1019/005550.481298:WARNING:chrome/browser/signin/account_consistency_mode_manager.cc:74] Desktop Identity Consistency cannot be enabled as no OAuth client ID and client secret have been configured.
+[14101:14101:1019/005551.087970:ERROR:dbus/object_proxy.cc:573] Failed to call method: org.freedesktop.DBus.Properties.GetAll: object_path= /org/freedesktop/UPower/devices/DisplayDevice: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.UPower was not provided by any .service files
+[14101:14101:1019/005551.088243:WARNING:dbus/property.cc:174] GetAll request failed for: org.freedesktop.UPower.Device
+[14101:14101:1019/005551.130179:WARNING:ui/base/idle/idle_linux.cc:98] None of the known D-Bus ScreenSaver services could be used.
+[14232:14269:1019/005557.425197:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:885] Running WebRTC with a combined Network and Worker thread.
+[14101:14101:1019/005558.591596:INFO:CONSOLE:7] "Uncaught (in promise) Error: Unable to resolve specifier 'vacancies' imported from https://officemanager.dodopizza.ru/appshell/dist/initPublicPaths.bundle.3h4HOW2I.js", source: https://officemanager.dodopizza.ru/appshell/dist/supportScripts.bundle.Cg5SS7DQ.js (7)
+[14232:14269:1019/005559.775162:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:885] Running WebRTC with a combined Network and Worker thread.
+[14232:14270:1019/005601.958946:WARNING:third_party/webrtc/media/engine/webrtc_voice_engine.cc:806] Attempting to stop aecdump when no audio processing module is present
+[14101:14117:1019/005602.331773:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: QUOTA_EXCEEDED
+[14131:14149:1019/005648.770855:WARNING:net/spdy/spdy_session.cc:3071] Received HEADERS for invalid stream 131
+[14232:14269:1019/005648.933010:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:885] Running WebRTC with a combined Network and Worker thread.
+[14232:14270:1019/005649.470368:WARNING:third_party/webrtc/media/engine/webrtc_voice_engine.cc:806] Attempting to stop aecdump when no audio processing module is present
+[14131:14149:1019/005651.297412:WARNING:net/spdy/spdy_session.cc:3071] Received HEADERS for invalid stream 135
+[14232:14269:1019/005652.390433:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:885] Running WebRTC with a combined Network and Worker thread.
+[14232:14269:1019/005653.977004:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:885] Running WebRTC with a combined Network and Worker thread.
+[14232:14270:1019/005656.933204:WARNING:third_party/webrtc/media/engine/webrtc_voice_engine.cc:806] Attempting to stop aecdump when no audio processing module is present
+[14232:14270:1019/005658.723167:WARNING:third_party/webrtc/media/engine/webrtc_voice_engine.cc:806] Attempting to stop aecdump when no audio processing module is present
+[14232:14269:1019/011246.024245:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:885] Running WebRTC with a combined Network and Worker thread.
+[14131:14149:1019/011246.853409:WARNING:net/spdy/spdy_session.cc:3071] Received HEADERS for invalid stream 353
+[14131:14149:1019/011246.878541:WARNING:net/spdy/spdy_session.cc:3026] Received WINDOW_UPDATE for invalid stream 31
+[14232:14269:1019/011248.004612:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:885] Running WebRTC with a combined Network and Worker thread.
+[14101:14101:1019/011249.431949:INFO:CONSOLE:7] "Uncaught (in promise) Error: Unable to resolve specifier 'vacancies' imported from https://officemanager.dodopizza.ru/appshell/dist/initPublicPaths.bundle.3h4HOW2I.js", source: https://officemanager.dodopizza.ru/appshell/dist/supportScripts.bundle.Cg5SS7DQ.js (7)
+[14131:14149:1019/011249.928901:WARNING:net/spdy/spdy_session.cc:3071] Received HEADERS for invalid stream 37
+[14232:14269:1019/011250.071595:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:885] Running WebRTC with a combined Network and Worker thread.
+[14232:14270:1019/011316.021983:WARNING:third_party/webrtc/media/engine/webrtc_voice_engine.cc:806] Attempting to stop aecdump when no audio processing module is present
+[14232:14270:1019/011316.022940:WARNING:third_party/webrtc/media/engine/webrtc_voice_engine.cc:806] Attempting to stop aecdump when no audio processing module is present
+[14232:14270:1019/011316.023725:WARNING:third_party/webrtc/media/engine/webrtc_voice_engine.cc:806] Attempting to stop aecdump when no audio processing module is present
+[14232:14269:1019/012239.189367:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:885] Running WebRTC with a combined Network and Worker thread.
+[14128:14159:1019/012240.037781:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:521] SharedImageManager::ProduceMemory: Trying to Produce a Memory representation from a non-existent mailbox.
+[14131:14149:1019/012240.082402:WARNING:net/spdy/spdy_session.cc:3071] Received HEADERS for invalid stream 675
+[14131:14149:1019/012240.093756:WARNING:net/spdy/spdy_session.cc:3026] Received WINDOW_UPDATE for invalid stream 55
+[14232:14269:1019/012241.308446:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:885] Running WebRTC with a combined Network and Worker thread.
+[14101:14101:1019/012242.041766:INFO:CONSOLE:7] "Uncaught (in promise) Error: Unable to resolve specifier 'vacancies' imported from https://officemanager.dodopizza.ru/appshell/dist/initPublicPaths.bundle.3h4HOW2I.js", source: https://officemanager.dodopizza.ru/appshell/dist/supportScripts.bundle.Cg5SS7DQ.js (7)
+[14131:14149:1019/012242.182639:WARNING:net/spdy/spdy_session.cc:3071] Received HEADERS for invalid stream 63
+[14131:14149:1019/012242.199428:WARNING:net/spdy/spdy_session.cc:3071] Received HEADERS for invalid stream 61
+[14232:14269:1019/012242.331143:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:885] Running WebRTC with a combined Network and Worker thread.
+[14232:14270:1019/012247.957747:WARNING:third_party/webrtc/media/engine/webrtc_voice_engine.cc:806] Attempting to stop aecdump when no audio processing module is present
+[14232:14270:1019/012247.968394:WARNING:third_party/webrtc/media/engine/webrtc_voice_engine.cc:806] Attempting to stop aecdump when no audio processing module is present
+[14232:14270:1019/012247.996069:WARNING:third_party/webrtc/media/engine/webrtc_voice_engine.cc:806] Attempting to stop aecdump when no audio processing module is present
+[14131:14149:1019/012257.302596:WARNING:net/spdy/spdy_session.cc:3071] Received HEADERS for invalid stream 737
+[14131:14149:1019/012257.312080:WARNING:net/spdy/spdy_session.cc:3071] Received HEADERS for invalid stream 739
+[14232:14269:1019/012257.399474:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:885] Running WebRTC with a combined Network and Worker thread.
+[14232:14270:1019/012309.172987:WARNING:third_party/webrtc/media/engine/webrtc_voice_engine.cc:806] Attempting to stop aecdump when no audio processing module is present
+[14232:14269:1019/013917.970746:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:885] Running WebRTC with a combined Network and Worker thread.
+[14232:14270:1019/013920.215091:WARNING:third_party/webrtc/media/engine/webrtc_voice_engine.cc:806] Attempting to stop aecdump when no audio processing module is present
+[14232:14269:1019/014531.190795:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:885] Running WebRTC with a combined Network and Worker thread.
+[14232:14270:1019/014535.215931:WARNING:third_party/webrtc/media/engine/webrtc_voice_engine.cc:806] Attempting to stop aecdump when no audio processing module is present
+[14232:14269:1019/020053.963590:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:885] Running WebRTC with a combined Network and Worker thread.
+[14232:14270:1019/020057.509506:WARNING:third_party/webrtc/media/engine/webrtc_voice_engine.cc:806] Attempting to stop aecdump when no audio processing module is present
+[14232:14269:1019/021616.444331:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:885] Running WebRTC with a combined Network and Worker thread.
+[14232:14270:1019/021619.994427:WARNING:third_party/webrtc/media/engine/webrtc_voice_engine.cc:806] Attempting to stop aecdump when no audio processing module is present
+[14131:14149:1019/021647.651711:WARNING:net/spdy/spdy_session.cc:3071] Received HEADERS for invalid stream 1567
+[14232:14269:1019/021647.767954:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:885] Running WebRTC with a combined Network and Worker thread.
+[14131:14149:1019/021648.344604:WARNING:net/spdy/spdy_session.cc:3026] Received WINDOW_UPDATE for invalid stream 119
+[14131:14149:1019/021648.359937:WARNING:net/spdy/spdy_session.cc:3071] Received HEADERS for invalid stream 1571
+[14131:14149:1019/021648.410521:WARNING:net/spdy/spdy_session.cc:3071] Received HEADERS for invalid stream 119
+[14232:14269:1019/021649.435799:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:885] Running WebRTC with a combined Network and Worker thread.
+[14101:14101:1019/021650.283357:INFO:CONSOLE:7] "Uncaught (in promise) Error: Unable to resolve specifier 'vacancies' imported from https://officemanager.dodopizza.ru/appshell/dist/initPublicPaths.bundle.3h4HOW2I.js", source: https://officemanager.dodopizza.ru/appshell/dist/supportScripts.bundle.Cg5SS7DQ.js (7)
+[14131:14149:1019/021650.444871:WARNING:net/spdy/spdy_session.cc:3071] Received HEADERS for invalid stream 125
+[14131:14149:1019/021650.457477:WARNING:net/spdy/spdy_session.cc:3071] Received HEADERS for invalid stream 1575
+[14232:14269:1019/021650.560746:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:885] Running WebRTC with a combined Network and Worker thread.
+[14232:14270:1019/021654.444175:WARNING:third_party/webrtc/media/engine/webrtc_voice_engine.cc:806] Attempting to stop aecdump when no audio processing module is present
+[14232:14270:1019/021654.754659:WARNING:third_party/webrtc/media/engine/webrtc_voice_engine.cc:806] Attempting to stop aecdump when no audio processing module is present
+[14232:14270:1019/021654.757335:WARNING:third_party/webrtc/media/engine/webrtc_voice_engine.cc:806] Attempting to stop aecdump when no audio processing module is present
+[14232:14269:1019/023500.086107:INFO:third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:885] Running WebRTC with a combined Network and Worker thread.
+[14131:14149:1019/023501.311783:WARNING:net/spdy/spdy_session.cc:3071] Received HEADERS for invalid stream 1935
+[14131:14154:1019/023502.234905:WARNING:net/extras/sqlite/sqlite_persistent_store_backend_base.cc:176] Failed to post task from FlushAndNotifyInBackground@net/extras/sqlite/sqlite_persistent_store_backend_base.cc:226 to client_task_runner_.
+[14131:14154:1019/023502.235464:WARNING:net/extras/sqlite/sqlite_persistent_store_backend_base.cc:176] Failed to post task from FlushAndNotifyInBackground@net/extras/sqlite/sqlite_persistent_store_backend_base.cc:226 to client_task_runner_.

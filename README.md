@@ -78,6 +78,8 @@ Supabase и логирование
   CREATE INDEX analytics_lost_revenue_department_idx ON public.analytics_lost_revenue (department);
   COMMIT;
   ```
+- Таблица для скрипта MaterialConsumptionReport.py по умолчанию `material_consumption` (для upsert добавьте уникальный индекс по `city,department,dt,category` или настройте собственный `SUPABASE_ON_CONFLICT`).
+- Таблица для скрипта MaterialWriteOffReport.py по умолчанию `material_write_offs` (индексируйте `city,department,dt`, если используете `SUPABASE_ON_CONFLICT`).
 - Для LossesAndExcess не забудьте уникальный индекс под `SUPABASE_ON_CONFLICT` (по умолчанию `city,department,dt,revisions,metric_name`).
 
 Analytics: метрика «Доля упущенной выручки»

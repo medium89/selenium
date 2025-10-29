@@ -292,13 +292,26 @@ class ProjectManagerRunner:
                 pass
 
     def open_select_department(self) -> None:
-        self.driver.get(self.select_department_url)
-        self.ensure_role_selected()
-        if "/SelectDepartment" not in self.driver.current_url:
+        for attempt in range(2):
             try:
                 self.driver.get(self.select_department_url)
             except Exception:
                 pass
+            self.ensure_role_selected()
+            if "/SelectDepartment" in (self.driver.current_url or ""):
+                return
+            if attempt == 0:
+                # Попробуем сбросить привязку отдела и вернуться к SelectRole
+                try:
+                    self.driver.get(self.back_to_select_role_url)
+                except Exception:
+                    pass
+                try:
+                    WebDriverWait(self.driver, 10).until(EC.url_contains("/SelectRole"))
+                except Exception:
+                    pass
+                self.ensure_role_selected()
+        print(f"[nav] Не удалось напрямую открыть SelectDepartment, текущий URL: {self.driver.current_url}")
 
     def back_to_select_role(self) -> None:
         try:

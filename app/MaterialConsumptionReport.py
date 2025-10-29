@@ -72,7 +72,7 @@ class OfficeMaterialConsumptionReporter:
             self.supabase_key = config_key
         if not self.supabase_key:
             self.supabase_key = self._read_supabase_key_file()
-        self.supabase_table = os.environ.get("SUPABASE_TABLE", "store_metrics").strip() or "store_metrics"
+        self.supabase_table = os.environ.get("SUPABASE_TABLE", "material_consumption").strip() or "material_consumption"
         self.supabase_on_conflict = os.environ.get("SUPABASE_ON_CONFLICT", "").strip()
         self.supabase_batch_size = max(1, int(os.environ.get("SUPABASE_BATCH_SIZE", "50")))
         self.supabase_timeout = float(os.environ.get("SUPABASE_TIMEOUT", "15"))
@@ -178,13 +178,25 @@ class OfficeMaterialConsumptionReporter:
     # ---------- Навигация и авторизация ----------
     def open_select_department(self):
         print("[NAV] Перехожу на экран выбора города…")
-        self.driver.get(SELECT_DEPARTMENT_URL)
-        self.ensure_role_selected()
-        if "/SelectDepartment" not in self.driver.current_url:
+        for attempt in range(2):
             try:
                 self.driver.get(SELECT_DEPARTMENT_URL)
             except Exception:
                 pass
+            self.ensure_role_selected()
+            if "/SelectDepartment" in (self.driver.current_url or ""):
+                return
+            if attempt == 0:
+                # Попробуем вернуться на SelectRole и сбросить привязку
+                try:
+                    self.driver.get(BACK_TO_SELECT_ROLE_URL)
+                except Exception:
+                    pass
+                try:
+                    WebDriverWait(self.driver, 10).until(EC.url_contains("/SelectRole"))
+                except Exception:
+                    pass
+        print(f"[NAV] Не удалось открыть SelectDepartment, текущий URL: {self.driver.current_url}")
 
     def choose_role(self):
         print(f"[AUTH] Выбираю роль {ROLE_ID}…")
