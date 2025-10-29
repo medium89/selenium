@@ -20,14 +20,36 @@ BACK_TO_SELECT_ROLE_URL = "https://officemanager.dodopizza.ru/Infrastructure/Aut
 
 STEALTH = os.environ.get("STEALTH", "1")
 ROLE_ID = os.environ.get("ROLE_ID", "")
+REPO_ROOT = Path(__file__).resolve().parent.parent
+LOCAL_CHROMEDRIVER = REPO_ROOT / "bin" / "chromedriver"
+
+
+def _chromedriver_binary_ok(path: Path) -> bool:
+    if not path.exists() or not os.access(path, os.X_OK):
+        return False
+    try:
+        signature = path.open("rb").read(4)
+    except OSError:
+        return False
+    return signature.startswith(b"\x7fELF") or signature.startswith(b"MZ")
 
 
 def _make_service() -> Service:
-    driver_path = os.environ.get("CHROMEDRIVER")
-    if driver_path and Path(driver_path).exists():
-        return Service(driver_path)
+    env_path = (os.environ.get("CHROMEDRIVER") or "").strip()
+    candidates = [env_path, str(LOCAL_CHROMEDRIVER), "/usr/bin/chromedriver"]
+    for raw in candidates:
+        if not raw:
+            continue
+        path = Path(raw)
+        if _chromedriver_binary_ok(path):
+            print(f"[run] Использую chromedriver: {path}")
+            return Service(str(path))
+        if path.exists():
+            print(f"[run] {path} найден, но не похож на исполняемый chromedriver — пропускаю.")
+    if env_path:
+        print(f"[run] CHROMEDRIVER={env_path}, но рабочий драйвер не найден. Скачаю новый…")
     if ChromeDriverManager is None:
-        raise RuntimeError("Chromedriver not found and webdriver-manager is unavailable.")
+        raise RuntimeError("Chromedriver not found и webdriver-manager недоступен.")
     return Service(ChromeDriverManager().install())
 
 

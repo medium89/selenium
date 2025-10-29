@@ -2352,3 +2352,9 @@ stderr: Ошибка отправки: Supabase HTTP 404: {"code":"PGRST205","de
  {"id":1841,"city":"Тимашевск","department":"Тимашевск-1","dt":"2025-10-18","revisions":"firstRevisionId:30.09.2025 00:22 (Неделя), secondRevisionId:16.10.2025 23:23 (День)","metric_name":"Отказы","percent_value":0.07,"amount_value":1650.75,"created_at":"2025-10-18T19:34:59.614967+00:00","updated_at":"2025-10-18T19:34:59.614967+00:00"}, 
  {"id":1842,"city":"Тимашевск","department":"Тимашевск-1","dt":"2025-10-18","revisions":"firstRevisionId:30.09.2025 00:22 (Неделя), secondRevisionId:16.10.2025 23:23 (День)","metric_name":"Итого избыток","percent_value":0.12,"amount_value":2762.46,"created_at":"2025-10-18T19:34:59.614967+00:00","updated_at":"2025-10-18T19:34:59.614967+00:00"}]
 
+[2025-10-30 00:09:15] MaterialConsumptionReport — chunk 1/1 (rows: 4) — 4 rows
+[{"id":137,"city":"Абинск","department":"Абинск-1","dt":"2025-10-28","category":"Ингредиент","sales":60429.98,"production":5212.97,"staff_meals":1497.99,"cancellations":0.00,"defects":293.31}, 
+ {"id":138,"city":"Абинск","department":"Абинск-1","dt":"2025-10-28","category":"Упаковка","sales":5292.92,"production":0.00,"staff_meals":24.25,"cancellations":0.00,"defects":24.19}, 
+ {"id":139,"city":"Абинск","department":"Абинск-1","dt":"2025-10-29","category":"Ингредиент","sales":54237.59,"production":0.00,"staff_meals":1007.39,"cancellations":0.00,"defects":133.69}, 
+ {"id":140,"city":"Абинск","department":"Абинск-1","dt":"2025-10-29","category":"Упаковка","sales":4826.30,"production":0.00,"staff_meals":30.28,"cancellations":0.00,"defects":17.31}]
+

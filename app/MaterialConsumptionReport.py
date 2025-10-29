@@ -30,6 +30,8 @@ SLOW_DELAY = float(os.environ.get("SLOW_DELAY", "0"))
 STEALTH = os.environ.get("STEALTH", "1")  # 1 — включить анти‑headless твики
 SUPABASE_CONFIG_FILE = Path(os.environ.get("SUPABASE_CONFIG_FILE", "config/api"))
 BUGREPORT_FILE = Path("reports/bugrepot.txt")
+REPO_ROOT = Path(__file__).resolve().parent.parent
+LOCAL_CHROMEDRIVER = REPO_ROOT / "bin" / "chromedriver"
 
 
 def log_bugreport(context: str, count: int, stdout: str, stderr: str) -> None:
@@ -133,10 +135,31 @@ class OfficeMaterialConsumptionReporter:
         else:
             print("[INIT] Linux/Docker: внешний Chrome не запускаю (использую драйвер).")
 
+    @staticmethod
+    def _chromedriver_binary_ok(path: str) -> bool:
+        if not os.path.exists(path) or not os.access(path, os.X_OK):
+            return False
+        try:
+            with open(path, "rb") as fh:
+                signature = fh.read(4)
+        except OSError:
+            return False
+        # ELF — Linux, MZ — Windows PE. Обёртки shell/powershell начинаются с "#!" и не подходят.
+        return signature.startswith(b"\x7fELF") or signature.startswith(b"MZ")
+
     def _make_service(self) -> Service:
-        path = os.environ.get("CHROMEDRIVER", "/usr/bin/chromedriver")
-        if path and os.path.exists(path):
-            return Service(path)
+        env_path = os.environ.get("CHROMEDRIVER", "").strip()
+        candidates = [env_path, str(LOCAL_CHROMEDRIVER), "/usr/bin/chromedriver"]
+        for path in candidates:
+            if not path:
+                continue
+            if self._chromedriver_binary_ok(path):
+                print(f"[DRIVER] Использую chromedriver: {path}")
+                return Service(path)
+            if os.path.exists(path):
+                print(f"[DRIVER] {path} найден, но не выглядит как исполняемый chromedriver — пропускаю.")
+        if env_path:
+            print(f"[DRIVER] CHROMEDRIVER={env_path}, но рабочий бинарник не найден. Скачаю свежую копию…")
         return Service(ChromeDriverManager().install())
 
     def connect_driver(self):

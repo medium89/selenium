@@ -1,9 +1,3 @@
-<<<<<<< HEAD
-2025/10/19-00:55:53.890 3754 Reusing MANIFEST /mnt/e/_Server/_newserver/OSPanel/domains/selenium/profile/Default/Session Storage/MANIFEST-000001
-2025/10/19-00:55:54.044 3754 Recovering log #7
-2025/10/19-00:55:54.049 3754 Reusing old log /mnt/e/_Server/_newserver/OSPanel/domains/selenium/profile/Default/Session Storage/000007.log 
-=======
-2025/10/18-12:14:44.438 1ce7 Reusing MANIFEST /mnt/e/_Server/_newserver/OSPanel/domains/selenium/profile/Default/Session Storage/MANIFEST-000001
-2025/10/18-12:14:44.454 1ce7 Recovering log #7
-2025/10/18-12:14:44.456 1ce7 Reusing old log /mnt/e/_Server/_newserver/OSPanel/domains/selenium/profile/Default/Session Storage/000007.log 
->>>>>>> 0c36965e0cbb607dd6d054d725084ef8eb14ac34
+2025/10/30-00:08:58.545 7 Reusing MANIFEST /mnt/e/_Server/_newserver/OSPanel/domains/selenium/profile/Default/Session Storage/MANIFEST-000001
+2025/10/30-00:08:58.724 7 Recovering log #7
+2025/10/30-00:08:58.730 7 Reusing old log /mnt/e/_Server/_newserver/OSPanel/domains/selenium/profile/Default/Session Storage/000007.log 
