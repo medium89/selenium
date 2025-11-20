@@ -13,13 +13,14 @@ import os
 import socket
 import subprocess
 import time
-import itertools
 import json
+import re
 import urllib.parse
 
 
 PORT = 9223
 CSV_FILE = "reports/LossesAndExcessReport.csv"
+JSON_FILE = "reports/LossesAndExcessReport.jsonl"
 BUGREPORT_FILE = Path("reports/bugrepot.txt")
 REPORT_URL = "https://officemanager.dodopizza.ru/InventoryManager/LossesAndExcees"
 SELECT_DEPARTMENT_URL = "https://officemanager.dodopizza.ru/Infrastructure/Authenticate/SelectDepartment"
@@ -29,6 +30,13 @@ SLOW_DELAY = float(os.environ.get("SLOW_DELAY", "0"))
 STEALTH = os.environ.get("STEALTH", "1")
 SUPABASE_CONFIG_FILE = Path(os.environ.get("SUPABASE_CONFIG_FILE", "config/api"))
 SUPABASE_KEY_FILE = Path(os.environ.get("SUPABASE_KEY_FILE", "config/api.key"))
+
+LIQUID_KEYWORDS = tuple(k.lower() for k in ("сок", "вода", "смузи", "чай", "морс", "лимонад", "компот"))
+LIQUID_KEYWORD_EXCEPTIONS = tuple(k.lower() for k in ("бонаква", "бон аква", "bone aqua", "bonaqua"))
+TARGET_METRIC_KEY = "сыр моцарелла"
+ESSENTUKI_KEYWORDS = ("ессентук",)
+DEFAULT_HIGHLIGHT_BG = "#d4f8c4"
+DEFAULT_HIGHLIGHT_BORDER = "2px solid #38a169"
 
 
 class LossesAndExcessReporter:
@@ -56,9 +64,18 @@ class LossesAndExcessReporter:
         self.supabase_batch_size = max(1, int(os.environ.get("SUPABASE_BATCH_SIZE", "50")))
         self.supabase_timeout = float(os.environ.get("SUPABASE_TIMEOUT", "15"))
         self.supabase_enabled = bool(self.supabase_url and self.supabase_key)
+        self.supabase_queue_table = os.environ.get("SUPABASE_QUEUE_TABLE", "metric_queue").strip() or "metric_queue"
+        self.supabase_queue_filter = os.environ.get("SUPABASE_QUEUE_FILTER", "is_done=eq.false&order=created_at.asc").strip()
         self._supabase_warned = False
         self._supabase_conflict_forced_off = False
         self._supabase_conflict_notice_shown = False
+        self.highlight_bg = os.environ.get("HIGHLIGHT_BG", DEFAULT_HIGHLIGHT_BG)
+        self.highlight_border = os.environ.get("HIGHLIGHT_BORDER", DEFAULT_HIGHLIGHT_BORDER)
+        self.highlight_target_bg = os.environ.get("HIGHLIGHT_TARGET_BG", "#c6f6d5")
+        self.highlight_target_border = os.environ.get("HIGHLIGHT_TARGET_BORDER", "2px solid #38a169")
+        self.highlight_liquid_bg = os.environ.get("HIGHLIGHT_LIQUID_BG", "#fde8e8")
+        self.highlight_liquid_border = os.environ.get("HIGHLIGHT_LIQUID_BORDER", "2px solid #f56565")
+        self._city_cache: Dict[str, Tuple[str, str]] = {}
         default_field_map = {
             "city": os.environ.get("SUPABASE_FIELD_CITY", "city"),
             "department": os.environ.get("SUPABASE_FIELD_DEPARTMENT", "department"),
@@ -67,6 +84,7 @@ class LossesAndExcessReporter:
             "metric": os.environ.get("SUPABASE_FIELD_METRIC", "metric_name"),
             "percent": os.environ.get("SUPABASE_FIELD_PERCENT", "percent_value"),
             "amount": os.environ.get("SUPABASE_FIELD_AMOUNT", "amount_value"),
+            "queue_id": os.environ.get("SUPABASE_FIELD_QUEUE_ID", "id_queue"),
         }
         field_map_override = os.environ.get("SUPABASE_FIELD_MAP", "").strip()
         if field_map_override:
@@ -77,7 +95,6 @@ class LossesAndExcessReporter:
             except json.JSONDecodeError:
                 print("[SUPABASE] Не удалось разобрать SUPABASE_FIELD_MAP как JSON — использую значения по умолчанию.")
         self.supabase_field_map = default_field_map
-        self._supabase_buffer: List[List[str]] = []
 
     def launch_chrome(self):
         print("[INIT] Настройка Chrome…")
@@ -186,6 +203,167 @@ class LossesAndExcessReporter:
                 pass
         except Exception:
             pass
+
+    def _highlight_elements(self, selectors: List[str]):
+        selector = ",".join([s for s in selectors if s]).strip()
+        if not selector:
+            return
+        try:
+            self.driver.execute_script(
+                """
+                (function(sel, bg, border){
+                  if(!sel) return;
+                  var nodes;
+                  try { nodes = document.querySelectorAll(sel); } catch(err){ return; }
+                  nodes.forEach(function(el){
+                    try {
+                      if(bg){ el.style.setProperty('background-color', bg, 'important'); }
+                      if(border){ el.style.setProperty('border', border, 'important'); }
+                    } catch(styleErr){}
+                  });
+                })(arguments[0], arguments[1], arguments[2]);
+                """,
+                selector,
+                self.highlight_bg,
+                self.highlight_border,
+            )
+        except Exception:
+            pass
+
+    def _highlight_webelement(self, element, bg: Optional[str] = None, border: Optional[str] = None):
+        if not element:
+            return
+        try:
+            self.driver.execute_script(
+                """
+                (function(el, bg, border){
+                  if(!el) return;
+                  try {
+                    if(bg){ el.style.setProperty('background-color', bg, 'important'); }
+                    if(border){ el.style.setProperty('border', border, 'important'); }
+                  } catch(err){}
+                })(arguments[0], arguments[1], arguments[2]);
+                """,
+                element,
+                bg,
+                border,
+            )
+        except Exception:
+            pass
+
+    def _normalize_city_key(self, name: str) -> str:
+        base = re.sub(r"[\s\-]+", " ", (name or "").strip()).lower()
+        base = re.sub(r"\s+\d+$", "", base).strip()
+        return base
+
+    def _normalize_unit_key(self, name: str) -> str:
+        return re.sub(r"[\s\-]+", "", (name or "").strip().lower())
+
+    def _split_pizzeria_name(self, name: str) -> Tuple[str, str]:
+        name = (name or "").strip()
+        match = re.match(r"^(.*?)(\s+(\d+))?$", name)
+        if not match:
+            return name, name
+        base = (match.group(1) or "").strip()
+        number = (match.group(3) or "").strip()
+        if number:
+            unit = f"{base}-{number}"
+        else:
+            unit = base
+        return base, unit
+
+    def _ensure_city_cache(self):
+        if self._city_cache:
+            return
+        cities = self.get_cities()
+        for name, uuid in cities:
+            key = self._normalize_city_key(name)
+            if key and key not in self._city_cache:
+                self._city_cache[key] = (name, uuid)
+
+    def _find_city_entry(self, target_name: str) -> Optional[Tuple[str, str]]:
+        self._ensure_city_cache()
+        key = self._normalize_city_key(target_name)
+        return self._city_cache.get(key)
+
+    def _find_unit_option(self, units: List[Tuple[str, str]], target_name: str) -> Optional[Tuple[str, str]]:
+        target_key = self._normalize_unit_key(target_name)
+        alt_key = self._normalize_unit_key(target_name.replace("-", " "))
+        for display, value in units:
+            unit_key = self._normalize_unit_key(display)
+            if unit_key == target_key or unit_key == alt_key:
+                return display, value
+        return None
+
+    def _fetch_metric_queue(self) -> List[Dict[str, Any]]:
+        if not self.supabase_enabled:
+            print("[QUEUE] Supabase не настроен — задачи не получены.")
+            return []
+        base_url = self.supabase_url.rstrip("/")
+        query_parts = ["select=*"]
+        if self.supabase_queue_filter:
+            query_parts.append(self.supabase_queue_filter)
+        endpoint = f"{base_url}/rest/v1/{self.supabase_queue_table}?{'&'.join(query_parts)}"
+        cmd = [
+            "curl",
+            "-sS",
+            "-H",
+            f"apikey: {self.supabase_key}",
+            "-H",
+            f"Authorization: Bearer {self.supabase_key}",
+            endpoint,
+        ]
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        except Exception as exc:
+            print(f"[QUEUE] Не удалось выполнить curl: {exc}")
+            return []
+        if result.returncode != 0:
+            print(f"[QUEUE] curl exit code {result.returncode}: {result.stderr.strip()}")
+            return []
+        try:
+            payload = json.loads(result.stdout or "[]")
+        except json.JSONDecodeError as exc:
+            print(f"[QUEUE] Некорректный JSON: {exc}")
+            return []
+        if not isinstance(payload, list):
+            print("[QUEUE] Ожидался список задач.")
+            return []
+        return payload
+
+    def _match_revision_values(
+        self,
+        selects: List[Dict[str, Any]],
+        revisions: List[str],
+    ) -> Tuple[Dict[str, str], List[str]]:
+        assignments: Dict[str, str] = {}
+        missing: List[str] = []
+        used_selects: set[str] = set()
+
+        for revision_text in revisions:
+            revision_text = (revision_text or "").strip()
+            if not revision_text:
+                continue
+            revision_key = revision_text.lower()
+            matched = False
+            for select_info in selects:
+                select_id = (select_info.get("id") or "").strip()
+                select_name = (select_info.get("name") or "").strip()
+                identifier = select_id or select_name
+                if not identifier or identifier in used_selects:
+                    continue
+                for opt in select_info.get("options") or []:
+                    opt_text = (opt.get("text") or "").strip()
+                    if revision_key in opt_text.lower():
+                        assignments[identifier] = opt.get("value") or ""
+                        used_selects.add(identifier)
+                        matched = True
+                        break
+                if matched:
+                    break
+            if not matched:
+                missing.append(revision_text)
+        return assignments, missing
 
     # ---------- Навигация и авторизация ----------
     def open_select_department(self):
@@ -339,34 +517,163 @@ class LossesAndExcessReporter:
             self.driver.execute_script(js, value)
         except Exception:
             pass
+        self._highlight_elements(["#UnitId", "[name='UnitId']", "select[data-live-search][name='UnitId']"])
         if self.slow:
             time.sleep(self.slow)
 
     def set_date_single(self, dt: datetime.date):
-        date_str = dt.strftime("%d.%m.%Y")
-        js = """
-        (function(val){
-          function setValue(id){
-            var el = document.getElementById(id);
-            if(!el) return false;
-            el.value = val;
-            try { el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); } catch(e) {
-              var ev=document.createEvent('HTMLEvents'); ev.initEvent('change',true,false); el.dispatchEvent(ev);
-            }
-            return true;
-          }
-          var ids = ['Date','DatePeriod','DatePeriodStart','DatePeriodEnd','StartDate','EndDate','SelectedDate'];
-          var ok = false;
-          for (var i=0;i<ids.length;i++) { ok = setValue(ids[i]) || ok; }
-          return ok;
-        })(arguments[0]);
-        """
+        self.set_date_range(dt, dt)
+
+    def _read_date_values(self) -> Dict[str, str]:
         try:
-            self.driver.execute_script(js, date_str)
+            values = self.driver.execute_script(
+                """
+                var out = {};
+                var nodes = document.querySelectorAll('[id*=\"Date\"],[name*=\"Date\"],[id*=\"Period\"],[name*=\"Period\"]');
+                Array.prototype.forEach.call(nodes, function(el){
+                  if(!el) return;
+                  var key = el.id || el.name;
+                  if(!key) return;
+                  if(typeof el.value !== 'undefined'){ out[key] = String(el.value || ''); }
+                });
+                return out;
+                """
+            )
+            if isinstance(values, dict):
+                return {str(k): str(v) for k, v in values.items()}
         except Exception:
             pass
-        if self.slow:
-            time.sleep(self.slow)
+        return {}
+
+    def set_date_range(self, start: datetime.date, end: datetime.date):
+        start_str = start.strftime("%d.%m.%Y")
+        end_str = end.strftime("%d.%m.%Y")
+        expected_range = f"{start_str} - {end_str}"
+        js = """
+        (function(startVal, endVal, highlightColor, highlightBorder){
+          function toDate(val){
+            var parts = (val||'').split('.');
+            if(parts.length === 3){
+              return new Date(parts[2], parseInt(parts[1],10)-1, parts[0]);
+            }
+            return null;
+          }
+          function setElementValue(el, val){
+            if(!el) return;
+            try {
+              if (typeof el.value !== 'undefined' && el.value !== val) {
+                el.value = val;
+              }
+              if (el.setAttribute) {
+                el.setAttribute('value', val);
+                if (el.getAttribute('data-value') !== null) {
+                  el.setAttribute('data-value', val);
+                }
+              }
+              if (el.type === 'date' && el.valueAsDate !== undefined) {
+                var d = toDate(val);
+                if (d) { el.valueAsDate = d; }
+              }
+              if (window.$) {
+                try {
+                  window.$(el).val(val);
+                  if (window.$(el).datepicker) { window.$(el).datepicker('setDate', val); }
+                  window.$(el).trigger('change');
+                } catch(jqErr){}
+              }
+              try { el.dispatchEvent(new Event('input',{bubbles:true})); } catch(evtErr1){
+                try { var ev1=document.createEvent('HTMLEvents'); ev1.initEvent('input',true,false); el.dispatchEvent(ev1); } catch(_) {}
+              }
+              try { el.dispatchEvent(new Event('change',{bubbles:true})); } catch(evtErr2){
+                try { var ev2=document.createEvent('HTMLEvents'); ev2.initEvent('change',true,false); el.dispatchEvent(ev2); } catch(_) {}
+              }
+              try { el.dispatchEvent(new Event('blur',{bubbles:true})); } catch(_) {}
+              try {
+                if (el.style && highlightColor) { el.style.setProperty('background-color', highlightColor, 'important'); }
+                if (el.style && highlightBorder) { el.style.setProperty('border', highlightBorder, 'important'); }
+              } catch(styleErr){}
+            } catch(err){}
+          }
+          function setSelectors(selectors, val){
+            var applied = false;
+            (selectors||[]).forEach(function(sel){
+              try {
+                var nodes = document.querySelectorAll(sel);
+                Array.prototype.forEach.call(nodes, function(node){
+                  setElementValue(node, val);
+                  applied = true;
+                });
+              } catch(err){}
+            });
+            return applied;
+          }
+          var startSelectors = [
+            '#DatePeriodStart','#StartDate','#DateStart','#DefaultBeginDateString',
+            'input[name=\"DatePeriodStart\"]','input[name=\"StartDate\"]','input[name=\"DateStart\"]',
+            'input[name=\"DefaultBeginDateString\"]','input[id$=\"BeginDateString\"]','input[data-role=\"start-date\"]'
+          ];
+          var endSelectors = [
+            '#DatePeriodEnd','#EndDate','#DateEnd','#Date','#SelectedDate','#DefaultEndDateString',
+            'input[name=\"DatePeriodEnd\"]','input[name=\"EndDate\"]','input[name=\"DateEnd\"]','input[name=\"Date\"]','input[name=\"SelectedDate\"]',
+            'input[name=\"DefaultEndDateString\"]','input[id$=\"EndDateString\"]','input[data-role=\"end-date\"]'
+          ];
+          var rangeSelectors = [
+            '#DatePeriod','#DateRange','#Period','#DefaultPeriodString',
+            'input[name=\"DatePeriod\"]','input[name=\"DateRange\"]','input[name=\"Period\"]','input[name=\"DefaultPeriodString\"]'
+          ];
+          var singleSelectors = [
+            '#Date','#SelectedDate','input[name=\"Date\"]','input[name=\"SelectedDate\"]','input[id$=\"SelectedDateString\"]'
+          ];
+          var rangeVal = startVal + ' - ' + endVal;
+          var anyApplied = false;
+          anyApplied = setSelectors(startSelectors, startVal) || anyApplied;
+          anyApplied = setSelectors(endSelectors, endVal) || anyApplied;
+          anyApplied = setSelectors(rangeSelectors, rangeVal) || anyApplied;
+          anyApplied = setSelectors(singleSelectors, endVal) || anyApplied;
+          return anyApplied;
+        })(arguments[0], arguments[1], arguments[2], arguments[3]);
+        """
+        applied = False
+        for attempt in range(3):
+            try:
+                self.driver.execute_script(js, start_str, end_str, self.highlight_bg, self.highlight_border)
+            except Exception:
+                pass
+            if self.slow:
+                time.sleep(self.slow)
+            values = self._read_date_values()
+            start_val = (
+                values.get("DatePeriodStart")
+                or values.get("StartDate")
+                or values.get("DateStart")
+                or values.get("DefaultBeginDateString")
+                or next((v for k, v in values.items() if k.lower().endswith("begindatestring")), "")
+            )
+            end_val = (
+                values.get("DatePeriodEnd")
+                or values.get("EndDate")
+                or values.get("DateEnd")
+                or values.get("Date")
+                or values.get("SelectedDate")
+                or values.get("DefaultEndDateString")
+                or next((v for k, v in values.items() if k.lower().endswith("enddatestring")), "")
+            )
+            range_val = (
+                values.get("DatePeriod")
+                or values.get("DateRange")
+                or values.get("Period")
+                or values.get("DefaultPeriodString")
+                or next((v for k, v in values.items() if k.lower().endswith("periodstring")), "")
+            )
+            if (start_val == start_str and end_val == end_str) or (range_val == expected_range):
+                applied = True
+                break
+            time.sleep(0.1)
+        if not applied:
+            fallback = range_val or ((start_val or "?") + "…" + (end_val or "?"))
+            print(f"[DATES] Не удалось надёжно установить период {expected_range}, текущее значение: {fallback}")
+        else:
+            print(f"[DATES] Период установлен: {expected_range}")
 
     def get_revision_selects(self) -> List[Dict[str, Any]]:
         try:
@@ -385,22 +692,40 @@ class LossesAndExcessReporter:
             ) or []
         except Exception:
             selects = []
+        highlight_selectors: List[str] = []
+        for sel in selects or []:
+            sid = (sel.get("id") or "").strip()
+            sname = (sel.get("name") or "").strip()
+            if sid:
+                safe_id = sid.replace("'", "\\'")
+                highlight_selectors.append(f"[id='{safe_id}']")
+            if sname:
+                safe_name = sname.replace("'", "\\'")
+                highlight_selectors.append(f"[name='{safe_name}']")
+        if highlight_selectors:
+            self._highlight_elements(highlight_selectors)
         return selects
 
     def set_revision_values(self, mapping: Dict[str, str]):
         try:
             self.driver.execute_script(
                 """
-                (function(map){
+                (function(map, highlightColor, highlightBorder){
                   Object.keys(map||{}).forEach(function(k){
                     var el = document.getElementById(k) || document.querySelector('[name="'+k+'"]');
                     if(!el) return;
                     el.value = map[k];
                     try{ el.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){ var ev=document.createEvent('HTMLEvents'); ev.initEvent('change',true,false); el.dispatchEvent(ev); }
+                    try {
+                      if (el.style && highlightColor) { el.style.setProperty('background-color', highlightColor, 'important'); }
+                      if (el.style && highlightBorder) { el.style.setProperty('border', highlightBorder, 'important'); }
+                    } catch(err){}
                   });
-                })(arguments[0]);
+                })(arguments[0], arguments[1], arguments[2]);
                 """,
                 mapping,
+                self.highlight_bg,
+                self.highlight_border,
             )
         except Exception:
             pass
@@ -412,14 +737,21 @@ class LossesAndExcessReporter:
                 self.driver.execute_script("arguments[0].scrollIntoView({block:'center'});", btn)
             except Exception:
                 pass
+            self._highlight_webelement(btn, self.highlight_bg, self.highlight_border)
             btn.click()
+            self._pause_after_build()
             return True
         except Exception:
             try:
+                self._highlight_elements(["#buildReportButton", "[id='buildReportButton']", "button[onclick*='buildReport']", "a[onclick*='buildReport']"])
                 self.driver.execute_script("if (typeof buildReport === 'function') buildReport();")
+                self._pause_after_build()
                 return True
             except Exception:
                 return False
+
+    def _pause_after_build(self):
+        pass
 
     def wait_stats_changed(self, old_sig: Optional[int], timeout: int = 30):
         if old_sig is None:
@@ -450,11 +782,22 @@ class LossesAndExcessReporter:
             trs = table.find_elements(By.TAG_NAME, "tr")
         except Exception:
             return rows
+        self._highlight_webelement(table, self.highlight_bg, self.highlight_border)
+        target_kw = TARGET_METRIC_KEY.lower()
         for tr in trs:
             tds = tr.find_elements(By.TAG_NAME, "td")
             if not tds:
                 continue
             rows.append([(td.text or "").strip() for td in tds])
+            try:
+                metric_text = (tds[0].text or "").strip()
+            except Exception:
+                metric_text = ""
+            metric_lower = metric_text.lower()
+            if self._is_target_metric(metric_lower):
+                self._highlight_webelement(tr, self.highlight_target_bg, self.highlight_target_border)
+            elif self._is_liquid_metric(metric_lower):
+                self._highlight_webelement(tr, self.highlight_liquid_bg, self.highlight_liquid_border)
         return rows
 
     # ---------- CSV ----------
@@ -469,7 +812,28 @@ class LossesAndExcessReporter:
             w = csv.writer(f, delimiter=';')
             w.writerow(["Город","Отдел","Дата","Ревизии","Данные"])
 
-    def collect_table_rows(self, city: str, unit: str, date_str: str, revisions_human: str, rows: List[List[str]]):
+    def reset_json(self):
+        try:
+            d = os.path.dirname(JSON_FILE)
+            if d:
+                os.makedirs(d, exist_ok=True)
+        except Exception:
+            pass
+        Path(JSON_FILE).write_text("", encoding="utf-8")
+
+    def reset_outputs(self):
+        self.reset_csv()
+        self.reset_json()
+
+    def collect_table_rows(
+        self,
+        city: str,
+        unit: str,
+        date_str: str,
+        revisions_human: str,
+        rows: List[List[str]],
+        queue_id: Optional[Any] = None,
+    ):
         csv_rows: List[List[str]] = []
         sup_rows: List[List[str]] = []
         for r in rows:
@@ -478,7 +842,10 @@ class LossesAndExcessReporter:
             percent = parts[1] if len(parts) > 1 else ""
             amount = parts[2] if len(parts) > 2 else ""
             csv_rows.append([city, unit, date_str, revisions_human, metric, percent, amount])
-            sup_rows.append([city, unit, date_str, revisions_human, metric, percent, amount])
+            sup_row = [city, unit, date_str, revisions_human, metric, percent, amount]
+            if queue_id is not None:
+                sup_row.append(queue_id)
+            sup_rows.append(sup_row)
         return csv_rows, sup_rows
 
     def _write_city_rows(self, rows: List[List[str]]):
@@ -487,10 +854,31 @@ class LossesAndExcessReporter:
         with open(self.csv_file, "a", encoding="utf-8-sig", newline="") as f:
             csv.writer(f, delimiter=";").writerows(rows)
 
+    def _write_json_row(self, csv_row: List[str], queue_id: Optional[Any]) -> None:
+        if not csv_row:
+            return
+        try:
+            record = {
+                "city": csv_row[0] if len(csv_row) > 0 else "",
+                "department": csv_row[1] if len(csv_row) > 1 else "",
+                "date": csv_row[2] if len(csv_row) > 2 else "",
+                "revisions": csv_row[3] if len(csv_row) > 3 else "",
+                "metric": csv_row[4] if len(csv_row) > 4 else "",
+                "percent": csv_row[5] if len(csv_row) > 5 else "",
+                "amount": csv_row[6] if len(csv_row) > 6 else "",
+                "queue_id": queue_id,
+            }
+            with open(JSON_FILE, "a", encoding="utf-8") as f:
+                f.write(json.dumps(record, ensure_ascii=False))
+                f.write("\n")
+        except Exception as exc:
+            print(f"[JSON] Не удалось записать запись: {exc}")
+
     def _build_supabase_record(self, row: List[str]) -> Optional[dict]:
         if len(row) < 7:
             return None
         city, dept, date_str, revisions, metric, percent, amount = row[:7]
+        queue_id = row[7] if len(row) > 7 else None
         fm = self.supabase_field_map
         return {
             fm["city"]: city,
@@ -500,24 +888,19 @@ class LossesAndExcessReporter:
             fm["metric"]: metric,
             fm["percent"]: self._parse_number(percent),
             fm["amount"]: self._parse_number(amount),
+            fm.get("queue_id", "id_queue"): queue_id,
         }
 
     def _queue_supabase_rows(self, rows: List[List[str]]) -> None:
         if not rows:
             return
-        self._supabase_buffer.extend(rows)
-        if len(self._supabase_buffer) >= self.supabase_batch_size:
-            self._flush_supabase_buffer()
-
-    def _flush_supabase_buffer(self) -> None:
-        if not self._supabase_buffer:
-            return
         try:
-            self._push_supabase_rows(self._supabase_buffer)
+            self._push_supabase_rows(rows)
         except Exception as exc:
             print(f"[SUPABASE] Ошибка отправки: {exc}")
-        finally:
-            self._supabase_buffer.clear()
+
+    def _flush_supabase_buffer(self) -> None:
+        return
 
     def _log_db_response(self, context: str, count: int, stdout: str, stderr: str) -> None:
         try:
@@ -710,6 +1093,43 @@ class LossesAndExcessReporter:
             "on_conflict": use_conflict,
         }
 
+    def _mark_queue_done(self, queue_id: Optional[Any]) -> None:
+        if not self.supabase_enabled:
+            return
+        if queue_id is None:
+            return
+        queue_id_str = str(queue_id).strip()
+        if not queue_id_str:
+            return
+        base_url = self.supabase_url.rstrip("/")
+        encoded_id = urllib.parse.quote(queue_id_str, safe="")
+        endpoint = f"{base_url}/rest/v1/{self.supabase_queue_table}?id=eq.{encoded_id}"
+        payload = json.dumps({"is_done": True})
+        cmd = [
+            "curl",
+            "-sS",
+            "-X",
+            "PATCH",
+            "-H",
+            f"apikey: {self.supabase_key}",
+            "-H",
+            f"Authorization: Bearer {self.supabase_key}",
+            "-H",
+            "Content-Type: application/json",
+            "-H",
+            "Prefer: return=minimal",
+            endpoint,
+            "-d",
+            payload,
+        ]
+        if self.supabase_timeout > 0:
+            cmd.insert(1, "--max-time")
+            cmd.insert(2, str(self.supabase_timeout))
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            err = (result.stderr or result.stdout or "").strip()
+            print(f"[QUEUE] Не удалось обновить is_done для id={queue_id_str}: {err}")
+
     # ---------- Основной сценарий ----------
     def _parse_date(self, s: str) -> Optional[datetime.date]:
         s = (s or '').strip()
@@ -734,142 +1154,115 @@ class LossesAndExcessReporter:
                 continue
         return None
 
-    def prompt_date_range(self) -> List[datetime.date]:
-        while True:
-            try:
-                start_raw = input("[INPUT] Начальная дата (ДД.ММ.ГГГГ): ").strip()
-            except EOFError:
-                start_raw = ""
-            start = self._parse_date(start_raw)
-            if not start:
-                print("[INPUT] Некорректная дата. Пример: 01.09.2025")
-                continue
+    def _is_liquid_metric(self, metric_lower: str) -> bool:
+        if not metric_lower:
+            return False
+        for exception in LIQUID_KEYWORD_EXCEPTIONS:
+            if exception and exception in metric_lower:
+                return False
+        for keyword in LIQUID_KEYWORDS:
+            if keyword and keyword in metric_lower:
+                return True
+        return False
 
-            try:
-                end_raw = input("[INPUT] Конечная дата (ДД.ММ.ГГГГ): ").strip()
-            except EOFError:
-                end_raw = ""
-            end = self._parse_date(end_raw)
-            if not end:
-                print("[INPUT] Некорректная дата. Пример: 30.09.2025")
-                continue
+    def _is_target_metric(self, metric_lower: str) -> bool:
+        return bool(metric_lower and TARGET_METRIC_KEY.lower() in metric_lower)
 
-            if end < start:
-                print("[INPUT] Конечная дата раньше начальной — поменял местами.")
-                start, end = end, start
-            days = (end - start).days + 1
-            return [start + datetime.timedelta(days=i) for i in range(days)]
+    def _process_task(self, task: Dict[str, Any]):
+        pizzeria_name = task.get("pizzeria_name") or ""
+        date_start_raw = task.get("date_start") or ""
+        date_end_raw = task.get("date_end") or ""
+        revision_start = task.get("revision_start_string") or ""
+        revision_end = task.get("revision_end_string") or ""
+        queue_id = task.get("id")
+
+        city_name, unit_candidate = self._split_pizzeria_name(pizzeria_name)
+        city_entry = self._find_city_entry(city_name)
+        if not city_entry:
+            raise RuntimeError(f"Город '{city_name}' не найден на странице выбора.")
+        city_display, city_uuid = city_entry
+
+        try:
+            start_dt = datetime.date.fromisoformat(date_start_raw)
+        except Exception:
+            start_dt = self._parse_date(date_start_raw) or datetime.date.today()
+        try:
+            end_dt = datetime.date.fromisoformat(date_end_raw)
+        except Exception:
+            end_dt = self._parse_date(date_end_raw) or datetime.date.today()
+
+        self.select_city(city_uuid)
+        self.open_report_for_city(city_uuid)
+
+        units = self.get_units()
+        unit_match = self._find_unit_option(units, unit_candidate)
+        if not unit_match:
+            raise RuntimeError(f"Отдел '{unit_candidate}' не найден в списке для города {city_display}.")
+        unit_display, unit_value = unit_match
+        self.choose_unit(unit_value)
+
+        self.set_date_range(start_dt, end_dt)
+        rev_selects = self.get_revision_selects()
+        assignments, missing = self._match_revision_values(rev_selects, [revision_start, revision_end])
+        if assignments:
+            self.set_revision_values(assignments)
+        if missing:
+            print(f"[REVISIONS] Не найдены ревизии: {', '.join(missing)}")
+
+        try:
+            old_sig = self.driver.execute_script(
+                "var t=document.querySelector('table'); return t ? (t.innerText||'').length : null;"
+            )
+        except Exception:
+            old_sig = None
+
+        if not self.build_report():
+            print("[BUILD] Не удалось инициировать построение отчёта.")
+        self.wait_stats_changed(old_sig, timeout=30)
+
+        rows = self.read_statistics_table()
+        date_label = end_dt.strftime("%d.%m.%Y")
+        revision_label = f"{revision_start} -> {revision_end}".strip(" ->")
+        print(f"[DATA] {city_display} / {unit_display} / {date_label}: {len(rows)} строк")
+        if not rows:
+            self._mark_queue_done(queue_id)
+            return
+
+        csv_rows, sup_rows = self.collect_table_rows(
+            city_display,
+            unit_display,
+            date_label,
+            revision_label,
+            rows,
+            queue_id=queue_id,
+        )
+
+        for csv_row, sup_row in zip(csv_rows, sup_rows):
+            self._write_city_rows([csv_row])
+            queue_value = sup_row[7] if len(sup_row) > 7 else queue_id
+            self._write_json_row(csv_row, queue_value)
+            self._queue_supabase_rows([sup_row])
+
+        self._mark_queue_done(queue_id)
 
     def run(self):
         self.launch_chrome()
         self.connect_driver()
-        dates = self.prompt_date_range()
-        if not dates:
-            print("[DATES] Диапазон дат пуст — выход.")
+        tasks = self._fetch_metric_queue()
+        if not tasks:
+            print("[QUEUE] Задач не найдено — выхожу.")
             return
-        self.reset_csv()
+        print(f"[QUEUE] Получено задач: {len(tasks)}")
+        self.reset_outputs()
+        self._ensure_city_cache()
 
-        cities = self.get_cities()
-        print(f"[CITIES] К обработке: {[c[0] for c in cities]}")
-
-        for cidx, (city_name, city_uuid) in enumerate(cities, start=1):
+        for idx, task in enumerate(tasks, start=1):
             print("\n" + "#" * 80)
-            print(f"[CITY] ({cidx}/{len(cities)}) {city_name}")
+            print(f"[TASK] ({idx}/{len(tasks)}) {task.get('pizzeria_name', 'unknown')} — {task.get('date_start')} -> {task.get('date_end')}")
             try:
-                self.select_city(city_uuid)
-                self.open_report_for_city(city_uuid)
-
-                units = self.get_units()
-                for uidx, (unit_name, unit_val) in enumerate(units, start=1):
-                    print("\n" + "=" * 80)
-                    print(f"[UNIT] ({uidx}/{len(units)}) {unit_name}")
-                    self.choose_unit(unit_val)
-                    unit_csv_rows: List[List[str]] = []
-                    unit_sup_rows: List[List[str]] = []
-                    rev_selects = self.get_revision_selects()
-                    options_lists = []
-                    for s in rev_selects:
-                        opts = s.get('options') or []
-                        if len(opts) <= 1:
-                            options_lists.append([{ 'select': s.get('id') or s.get('name'), 'value': (opts[0]['value'] if opts else ''), 'text': (opts[0]['text'] if opts else '') }])
-                        else:
-                            options_lists.append([{ 'select': s.get('id') or s.get('name'), 'value': o['value'], 'text': o['text'] } for o in opts])
-                    if not options_lists:
-                        options_lists = [[{ 'select': '', 'value': '', 'text': '' }]]
-                    base_options = options_lists
-
-                    for dt_ in dates:
-                        date_str = dt_.strftime("%d.%m.%Y")
-                        self.set_date_single(dt_)
-                        options_lists = []
-                        for items in base_options:
-                            fresh = []
-                            for item in items:
-                                select_id = item.get('select') or ''
-                                value = item.get('value') or ''
-                                text = item.get('text') or value
-                                fresh.append({'select': select_id, 'value': value, 'text': text})
-                            if not fresh:
-                                fresh = [{'select': '', 'value': '', 'text': ''}]
-                            options_lists.append(fresh)
-                        combos = list(itertools.product(*options_lists))
-                        if len(combos) > 25:
-                            print(f"[REVISIONS] Слишком много комбинаций ({len(combos)}), обрезаю до 25…")
-                            combos = combos[:25]
-
-                        for ridx, combo in enumerate(combos, start=1):
-                            combo_map = {}
-                            revisions_human_list: List[str] = []
-                            for item in combo:
-                                sid = item.get('select') or ''
-                                val = item.get('value') or ''
-                                txt = item.get('text') or val
-                                if sid:
-                                    combo_map[sid] = val
-                                    revisions_human_list.append(f"{sid}:{txt}")
-                            revisions_human = ", ".join([x for x in revisions_human_list if x]) or "(нет)"
-                            if combo_map:
-                                self.set_revision_values(combo_map)
-                            try:
-                                old_sig = self.driver.execute_script(
-                                    "var t=document.querySelector('table'); return t ? (t.innerText||'').length : null;"
-                                )
-                            except Exception:
-                                old_sig = None
-                            ok = self.build_report()
-                            if not ok:
-                                print("[BUILD] Не удалось нажать кнопку построения.")
-                            self.wait_stats_changed(old_sig, timeout=30)
-
-                            rows = self.read_statistics_table()
-                            print(f"[CSV] {city_name} / {unit_name} / {date_str} / rev#{ridx}: {len(rows)} строк")
-                            if rows:
-                                csv_rows, sup_rows = self.collect_table_rows(city_name, unit_name, date_str, revisions_human, rows)
-                                unit_csv_rows.extend(csv_rows)
-                                unit_sup_rows.extend(sup_rows)
-
-                    if unit_csv_rows:
-                        self._write_city_rows(unit_csv_rows)
-                    if unit_sup_rows:
-                        try:
-                            responses = self._push_supabase_rows(unit_sup_rows)
-                        except Exception as exc:
-                            total_rows = len(unit_sup_rows)
-                            error_text = f"Ошибка отправки в Supabase: {exc}"
-                            print(f"[SUPABASE] {error_text}")
-                            self._log_db_response(f"{city_name} / {unit_name} — ERROR (total rows: {total_rows})", 0, "", error_text)
-                            responses = []
-                        if responses:
-                            total_rows = len(unit_sup_rows)
-                            for resp_idx, resp in enumerate(responses, start=1):
-                                context = f"{city_name} / {unit_name} — chunk {resp_idx}/{len(responses)} (total rows: {total_rows})"
-                                self._log_db_response(context, int(resp.get("count", 0)), str(resp.get("stdout", "")), str(resp.get("stderr", "")))
-                    self.refresh_report_page()
-
-                self._flush_supabase_buffer()
-
-            except Exception as e:
-                print(f"[WARN] Ошибка в городе {city_name}: {e}")
+                self._process_task(task)
+            except Exception as exc:
+                print(f"[WARN] Ошибка обработки задачи #{task.get('id')}: {exc}")
             finally:
                 try:
                     self.back_to_select_role()
@@ -877,7 +1270,6 @@ class LossesAndExcessReporter:
                     pass
 
         self._flush_supabase_buffer()
-
         print(f"[DONE] Готово! Файл {self.csv_file} сохранён.")
 
     def close(self):

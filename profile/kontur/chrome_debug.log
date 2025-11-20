@@ -1,0 +1,32 @@
+[26531:26531:1114/150010.321183:INFO:components/enterprise/browser/controller/chrome_browser_cloud_management_controller.cc:206] No machine level policy manager exists.
+[26531:26531:1114/150010.896037:ERROR:dbus/object_proxy.cc:573] Failed to call method: org.freedesktop.DBus.Properties.GetAll: object_path= /org/freedesktop/UPower/devices/DisplayDevice: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.UPower was not provided by any .service files
+[26531:26531:1114/150010.896280:WARNING:dbus/property.cc:179] GetAll request failed for: org.freedesktop.UPower.Device
+[26531:26531:1114/150010.907466:WARNING:ui/base/idle/idle_linux.cc:98] None of the known D-Bus ScreenSaver services could be used.
+[26559:26559:1114/150011.732061:WARNING:ui/gfx/linux/gpu_memory_buffer_support_x11.cc:49] dri3 extension not supported.
+[26559:26559:1114/150011.783683:WARNING:sandbox/policy/linux/sandbox_linux.cc:414] InitializeSandbox() called with multiple threads in process gpu-process.
+[26559:26559:1114/150012.747562:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:389] SharedImageManager::ProduceSkia: Trying to Produce a Skia representation from a non-existent mailbox.
+[26559:26559:1114/150012.805642:ERROR:gpu/command_buffer/service/shared_image/shared_image_manager.cc:389] SharedImageManager::ProduceSkia: Trying to Produce a Skia representation from a non-existent mailbox.
+[26531:26531:1114/150013.359224:INFO:CONSOLE:1] "Стили виджета загружены", source: https://auth.kontur.ru/React/dist/sentry.js?v=8d1b2201393c9f0f07a3983ce4d0646cdaf93485 (1)
+[26531:26531:1114/150014.469222:INFO:CONSOLE:0] "[DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o", source: https://auth.kontur.ru/?customize=diadoc&back=https%3A%2F%2Fdiadoc.kontur.ru%2F (0)
+[26531:26531:1114/150014.624202:INFO:CONSOLE:1] "kt:err [object Object]", source: https://auth.kontur.ru/React/dist/sentry.js?v=8d1b2201393c9f0f07a3983ce4d0646cdaf93485 (1)
+[26531:26531:1114/150014.647215:INFO:CONSOLE:1] "kt:err [object Object]", source: https://auth.kontur.ru/React/dist/sentry.js?v=8d1b2201393c9f0f07a3983ce4d0646cdaf93485 (1)
+[26531:26531:1114/150015.774925:INFO:CONSOLE:1] "kt:err [object Object]", source: https://auth.kontur.ru/React/dist/sentry.js?v=8d1b2201393c9f0f07a3983ce4d0646cdaf93485 (1)
+[26531:26549:1114/150017.153508:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+[26531:26531:1114/150017.775958:INFO:CONSOLE:1] "kt:err [object Object]", source: https://auth.kontur.ru/React/dist/sentry.js?v=8d1b2201393c9f0f07a3983ce4d0646cdaf93485 (1)
+[26531:26531:1114/150022.776939:INFO:CONSOLE:1] "kt:err [object Object]", source: https://auth.kontur.ru/React/dist/sentry.js?v=8d1b2201393c9f0f07a3983ce4d0646cdaf93485 (1)
+[26531:26531:1114/150027.777896:INFO:CONSOLE:1] "kt:err [object Object]", source: https://auth.kontur.ru/React/dist/sentry.js?v=8d1b2201393c9f0f07a3983ce4d0646cdaf93485 (1)
+[26531:26531:1114/150032.778579:INFO:CONSOLE:1] "kt:err [object Object]", source: https://auth.kontur.ru/React/dist/sentry.js?v=8d1b2201393c9f0f07a3983ce4d0646cdaf93485 (1)
+[26531:26531:1114/150037.779393:INFO:CONSOLE:1] "kt:err [object Object]", source: https://auth.kontur.ru/React/dist/sentry.js?v=8d1b2201393c9f0f07a3983ce4d0646cdaf93485 (1)
+[26531:26549:1114/150040.740199:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+[26531:26531:1114/150045.201826:INFO:CONSOLE:1] "kt:err [object Object]", source: https://auth.kontur.ru/React/dist/sentry.js?v=8d1b2201393c9f0f07a3983ce4d0646cdaf93485 (1)
+[26531:26531:1114/150050.202709:INFO:CONSOLE:1] "kt:err [object Object]", source: https://auth.kontur.ru/React/dist/sentry.js?v=8d1b2201393c9f0f07a3983ce4d0646cdaf93485 (1)
+[26531:26531:1114/150055.203450:INFO:CONSOLE:1] "kt:err [object Object]", source: https://auth.kontur.ru/React/dist/sentry.js?v=8d1b2201393c9f0f07a3983ce4d0646cdaf93485 (1)
+[26531:26531:1114/150100.204289:INFO:CONSOLE:1] "kt:err [object Object]", source: https://auth.kontur.ru/React/dist/sentry.js?v=8d1b2201393c9f0f07a3983ce4d0646cdaf93485 (1)
+[26531:26531:1114/150105.205013:INFO:CONSOLE:1] "kt:err [object Object]", source: https://auth.kontur.ru/React/dist/sentry.js?v=8d1b2201393c9f0f07a3983ce4d0646cdaf93485 (1)
+[26531:26531:1114/150110.205677:INFO:CONSOLE:1] "kt:err [object Object]", source: https://auth.kontur.ru/React/dist/sentry.js?v=8d1b2201393c9f0f07a3983ce4d0646cdaf93485 (1)
+[26531:26531:1114/150115.206459:INFO:CONSOLE:1] "kt:err [object Object]", source: https://auth.kontur.ru/React/dist/sentry.js?v=8d1b2201393c9f0f07a3983ce4d0646cdaf93485 (1)
+[26531:26549:1114/150134.521911:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+[26531:26549:1114/150312.892284:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+[26531:26531:1114/150322.667502:ERROR:services/on_device_model/public/cpp/service_client.cc:36] Unexpected on_device_model service disconnect: Error loading backend.
+[26565:26616:1114/150422.113145:WARNING:net/extras/sqlite/sqlite_persistent_store_backend_base.cc:176] Failed to post task from FlushAndNotifyInBackground@net/extras/sqlite/sqlite_persistent_store_backend_base.cc:226 to client_task_runner_.
+[26565:26616:1114/150422.113576:WARNING:net/extras/sqlite/sqlite_persistent_store_backend_base.cc:176] Failed to post task from FlushAndNotifyInBackground@net/extras/sqlite/sqlite_persistent_store_backend_base.cc:226 to client_task_runner_.
