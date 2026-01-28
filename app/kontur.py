@@ -3,6 +3,8 @@ import hashlib
 import logging
 import os
 import re
+import shutil
+import subprocess
 import sys
 import time
 from datetime import datetime, timedelta
@@ -45,26 +47,60 @@ SUPABASE_DATA_URL = "https://jnjngpeyqfmhtrmmeizy.supabase.co/rest/v1/data_diado
 HEADLESS = os.environ.get("HEADLESS", "").strip().lower() in {"1", "true", "yes"}
 ACTION_DELAY = float(os.environ.get("ACTION_DELAY", "0"))
 DOWNLOAD_WAIT = float(os.environ.get("DOWNLOAD_WAIT", "7"))
-DOWNLOAD_DIR = Path(os.environ.get("DOWNLOAD_DIR", Path.cwd() / "downloads")).resolve()
-DOM_DUMP_DIR = Path(os.environ.get("DOM_DUMP_DIR", Path.cwd())).resolve()
-LOG_DIR = Path(os.environ.get("LOG_DIR", Path.cwd() / "logs")).resolve()
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DOWNLOAD_DIR = Path(os.environ.get("DOWNLOAD_DIR", PROJECT_ROOT / "downloads")).resolve()
+DOM_DUMP_DIR = Path(os.environ.get("DOM_DUMP_DIR", PROJECT_ROOT)).resolve()
+LOG_DIR = Path(os.environ.get("LOG_DIR", PROJECT_ROOT / "logs")).resolve()
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 LOG_FILE_PATH = LOG_DIR / f"kontur-{datetime.now().strftime('%Y%m%d-%H%M%S')}.log"
 LOG_LEVEL_NAME = os.environ.get("LOG_LEVEL", "INFO").upper()
+LOG_FILE_LEVEL_NAME = os.environ.get("LOG_FILE_LEVEL", "INFO").upper()
+LOG_STREAM_NAME = os.environ.get("LOG_STREAM", "stdout").strip().lower()
+SCREENSHOT_DIR = Path(os.environ.get("SCREENSHOT_DIR", PROJECT_ROOT / "screenshots")).resolve()
+FILTER_REQUIRED = os.environ.get("FILTER_REQUIRED", "0").strip().lower() in {"1", "true", "yes"}
+DATE_KIND = os.environ.get("DATE_KIND", "Получения").strip() or "Получения"
+LOG_ACTIONS = os.environ.get("LOG_ACTIONS", "1").strip().lower() in {"1", "true", "yes"}
+FAST_MODE = os.environ.get("FAST_MODE", "0").strip().lower() in {"1", "true", "yes"}
+HIGHLIGHT_UI = os.environ.get("HIGHLIGHT_UI", "1").strip().lower() in {"1", "true", "yes"}
+DEBUG_ARTIFACTS = os.environ.get("DEBUG_ARTIFACTS", "1").strip().lower() in {"1", "true", "yes"}
+DUMP_DOM_EACH_PAGE = os.environ.get("DUMP_DOM_EACH_PAGE", "1").strip().lower() in {"1", "true", "yes"}
+WAIT_DOCS_TIMEOUT = float(os.environ.get("WAIT_DOCS_TIMEOUT", "40"))
+WAIT_DOCS_POST_DELAY = float(os.environ.get("WAIT_DOCS_POST_DELAY", "1"))
 LOOKIN_API_URL = "https://api.lookin.team/api/rest/v1/payment_documents"
 LOOKIN_API_TOKEN = "zwbs1kjlVbKSMMdhKZU7HwHsfzETSYBxtVVvYhaBxDLJW"
+
+
+def _parse_log_level(level_name: str, default: int) -> int:
+    normalized = (level_name or "").strip().upper()
+    if not normalized:
+        return default
+    resolved = getattr(logging, normalized, None)
+    if isinstance(resolved, int):
+        return resolved
+    try:
+        return int(normalized)
+    except ValueError:
+        return default
 
 
 def _setup_logger() -> logging.Logger:
     logger = logging.getLogger("kontur")
     if logger.handlers:
         return logger
-    log_level = getattr(logging, LOG_LEVEL_NAME, logging.INFO)
-    logger.setLevel(log_level)
+
+    console_level = _parse_log_level(LOG_LEVEL_NAME, logging.INFO)
+    file_level = _parse_log_level(LOG_FILE_LEVEL_NAME, logging.INFO)
+    logger_level = min(
+        [level for level in (console_level, file_level) if level > 0] or [logging.DEBUG]
+    )
+    logger.setLevel(logger_level)
     formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
-    stream_handler = logging.StreamHandler()
+    stream = sys.stdout if LOG_STREAM_NAME in {"stdout", "out"} else sys.stderr
+    stream_handler = logging.StreamHandler(stream=stream)
+    stream_handler.setLevel(console_level)
     stream_handler.setFormatter(formatter)
-    file_handler = logging.FileHandler(LOG_FILE_PATH, encoding="utf-8")
+    file_handler = logging.FileHandler(LOG_FILE_PATH, encoding="utf-8", delay=True)
+    file_handler.setLevel(file_level)
     file_handler.setFormatter(formatter)
     logger.addHandler(stream_handler)
     logger.addHandler(file_handler)
@@ -86,6 +122,13 @@ def log_debug(message: str, *args: Any) -> None:
 
 def log_error(message: str, *args: Any) -> None:
     LOGGER.error(message, *args)
+
+
+def log_action(message: str, *args: Any) -> None:
+    if LOG_ACTIONS:
+        LOGGER.info(message, *args)
+    else:
+        LOGGER.debug(message, *args)
 
 
 def build_driver() -> webdriver.Chrome:
@@ -111,8 +154,24 @@ def build_driver() -> webdriver.Chrome:
     options.add_experimental_option("prefs", prefs)
 
     chrome_bin = os.environ.get("CHROME_BIN")
-    if chrome_bin:
+    if chrome_bin and Path(chrome_bin).exists():
         options.binary_location = chrome_bin
+    else:
+        detected = (
+            shutil.which("google-chrome")
+            or shutil.which("google-chrome-stable")
+            or shutil.which("chromium")
+            or shutil.which("chromium-browser")
+        )
+        if detected:
+            options.binary_location = detected
+        else:
+            raise RuntimeError(
+                "Не найден Chrome/Chromium. Установите браузер (google-chrome/chromium) "
+                "или запустите через Docker (docker/Dockerfile уже ставит Chromium)."
+            )
+
+    _validate_chrome_executable(options.binary_location)
 
     driver_path = os.environ.get("CHROMEDRIVER")
     if driver_path and Path(driver_path).exists():
@@ -122,7 +181,10 @@ def build_driver() -> webdriver.Chrome:
         if ChromeDriverManager is None:
             raise RuntimeError("Chromedriver not found and webdriver-manager is unavailable.")
         log_info("Chromedriver не указан, скачиваем через webdriver-manager.")
-        service = Service(ChromeDriverManager().install())
+        driver_path = ChromeDriverManager().install()
+        service = Service(driver_path)
+
+    _validate_chromedriver_executable(service.path)
 
     driver = webdriver.Chrome(service=service, options=options)
     try:
@@ -136,7 +198,66 @@ def build_driver() -> webdriver.Chrome:
     return driver
 
 
+def _validate_chromedriver_executable(driver_path: str) -> None:
+    if not driver_path:
+        return
+    path = Path(driver_path)
+    if not path.exists():
+        return
+    try:
+        result = subprocess.run(
+            [str(path), "--version"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except Exception as exc:
+        log_error("Не удалось выполнить chromedriver (%s): %r", path, exc)
+        return
+    if result.returncode == 0:
+        log_debug("chromedriver: %s", (result.stdout or "").strip())
+        return
+    stderr = (result.stderr or "").strip()
+    if "libnss3.so" in stderr:
+        log_error(
+            "chromedriver не запускается (нет libnss3). Для Ubuntu: sudo apt install -y libnss3"
+        )
+    elif "error while loading shared libraries" in stderr:
+        log_error("chromedriver не запускается: %s", stderr)
+
+
+def _validate_chrome_executable(chrome_path: str) -> None:
+    if not chrome_path:
+        return
+    path = Path(chrome_path)
+    if not path.exists():
+        raise RuntimeError(f"Chrome binary не найден по пути: {chrome_path}")
+    try:
+        result = subprocess.run(
+            [chrome_path, "--version"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except Exception as exc:
+        raise RuntimeError(f"Не удалось выполнить Chrome ({chrome_path}): {exc}") from exc
+    if result.returncode == 0:
+        log_debug("chrome: %s", (result.stdout or "").strip())
+        return
+    stderr = (result.stderr or "").strip()
+    if "snap-confine" in stderr or "Operation canceled" in stderr:
+        raise RuntimeError(
+            "Обнаружен snap-версия Chromium, она не запускается в вашем окружении (WSL/ограничения snap-confine). "
+            "Поставьте Google Chrome (deb) внутри WSL или используйте Docker."
+        )
+    raise RuntimeError(f"Chrome не запускается: {stderr or (result.stdout or '').strip() or 'unknown error'}")
+
+
 def pause_action(label: str) -> None:
+    if FAST_MODE:
+        return
     if ACTION_DELAY <= 0:
         return
     log_info("[PAUSE] %s", label)
@@ -336,16 +457,21 @@ def handle_documents_for_inn(
     except TimeoutException:
         log_error("Страница ИНН %s не загрузилась.", inn_str)
         return
-    try:
-        if not date_mode:
-            log_info("Применяем фильтр 'за месяц' для ИНН %s", inn_str)
-            apply_month_period_filter(driver)
-        else:
-            log_info("Режим обновления дат: фильтр не применяется для ИНН %s", inn_str)
-        documents = _collect_documents_from_page(driver, inn_str, date_mode=date_mode)
-    except Exception as exc:
-        log_error("Не удалось применить фильтр по периоду для ИНН %s: %s", inn_str, exc)
-        documents = []
+    filter_failed = False
+    if not date_mode:
+        log_info("Применяем фильтр 'за месяц' для ИНН %s", inn_str)
+        applied = apply_month_period_filter(driver)
+        if not applied:
+            filter_failed = True
+            _dump_debug_artifacts(driver, inn_str, "filter-error")
+            if FILTER_REQUIRED:
+                log_error("FILTER_REQUIRED=1, пропускаем ИНН %s из-за ошибки фильтра.", inn_str)
+                return
+    else:
+        log_info("Режим обновления дат: фильтр не применяется для ИНН %s", inn_str)
+    documents = _collect_documents_from_page(driver, inn_str, date_mode=date_mode)
+    if filter_failed:
+        log_info("Фильтр не применён для ИНН %s — продолжаем без фильтра.", inn_str)
     if not documents:
         log_info("Документы для ИНН %s не найдены после фильтрации.", inn_str)
         return
@@ -371,23 +497,105 @@ def handle_documents_for_inn(
     #     print(f"Кнопка скачивания недоступна для ИНН {inn_str}")
 
 
-def apply_month_period_filter(driver: webdriver.Chrome) -> None:
-    log_debug("Открываем диалог фильтров и выбираем период 'Месяц'.")
-    filtered_dialog = _open_filters_dialog(driver)
-    _select_period_radiobutton(driver, filtered_dialog)
-    _open_period_selector(driver, filtered_dialog)
+def apply_month_period_filter(driver: webdriver.Chrome) -> bool:
+    log_action("Пробуем применить период через диалог 'Фильтры'.")
+    try:
+        filtered_dialog = _open_filters_dialog(driver)
+        if _apply_month_period_filter_in_sidepage(driver, filtered_dialog):
+            _apply_filters(driver, filtered_dialog)
+            return True
+        _select_period_radiobutton(driver, filtered_dialog)
+        _open_period_selector(driver, filtered_dialog)
+        _choose_month_option(driver)
+        _apply_filters(driver, filtered_dialog)
+        return True
+    except Exception as exc:
+        log_info("Не удалось применить фильтр через диалог: %s", exc)
+        return False
+
+
+def _apply_month_period_filter_in_sidepage(
+    driver: webdriver.Chrome, dialog: WebElement
+) -> bool:
+    try:
+        container = dialog.find_element(By.XPATH, ".//*[@data-tid='ComplicatedDateFilter']")
+    except NoSuchElementException:
+        log_action("Блок фильтра даты в боковой панели не найден.")
+        return False
+
+    try:
+        kind_btn = container.find_element(
+            By.XPATH, ".//*[@data-tid='DateKindSelect']//button[@data-tid='Button__rootElement']"
+        )
+    except NoSuchElementException:
+        log_action("Селект типа даты не найден.")
+        return False
+    highlight_element(driver, kind_btn, "rgba(0, 128, 0, 0.25)")
+    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", kind_btn)
+    try:
+        kind_btn.click()
+    except Exception:
+        driver.execute_script("arguments[0].click();", kind_btn)
+    log_action("Открываем селект типа даты.")
+    pause_action("Открытие типа даты")
+
+    if not _click_menu_option_by_text(driver, DATE_KIND, exact=True):
+        log_action("Не удалось выбрать тип даты: %s", DATE_KIND)
+        return False
+    selected_kind = _read_date_kind_label(container)
+    if selected_kind and _normalize_ws(selected_kind).lower() != DATE_KIND.lower():
+        log_action("Выбран тип даты: %s (ожидалось %s). Повторяем.", selected_kind, DATE_KIND)
+        try:
+            kind_btn.click()
+        except Exception:
+            driver.execute_script("arguments[0].click();", kind_btn)
+        pause_action("Повторное открытие типа даты")
+        if not _click_menu_option_by_text(driver, DATE_KIND, exact=True):
+            return False
+        selected_kind = _read_date_kind_label(container)
+        if selected_kind and _normalize_ws(selected_kind).lower() != DATE_KIND.lower():
+            log_action("Не удалось выбрать тип даты: %s", DATE_KIND)
+            return False
+
+    if not _click_radio_by_label(container, "Период"):
+        log_action("Не удалось выбрать радиокнопку 'Период'.")
+        return False
+    log_action("Выбрана радиокнопка 'Период'.")
+    pause_action("Выбор радиокнопки 'Период'")
+
+    selector = None
+    try:
+        selector = WebDriverWait(driver, 10).until(
+            lambda d: _find_period_selector_in_menu(container)
+        )
+    except Exception:
+        selector = None
+    if selector is not None:
+        try:
+            selector.click()
+        except Exception:
+            driver.execute_script("arguments[0].click();", selector)
+        log_action("Открываем список периодов.")
+        pause_action("Открытие списка периода")
+    else:
+        log_action("Селект периода не найден.")
+        return False
+
+    log_action("Выбираем период: месяц.")
     _choose_month_option(driver)
-    _apply_filters(driver, filtered_dialog)
+    return True
 
 
 def _dialog_xpath() -> str:
     return (
-        "//div[@role='dialog' or contains(@data-tid,'Modal__content') or "
+        "//div[@role='dialog' or @data-tid='SidePage__root' or contains(@data-tid,'Modal__content') or "
         "contains(@data-tid,'ModalContainer') or contains(@class,'Modal')]"
     )
 
 
 def _dump_current_dom(driver: webdriver.Chrome, inn_str: str) -> None:
+    if not DEBUG_ARTIFACTS:
+        return
     DOM_DUMP_DIR.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     filename = f"dom-{inn_str}-{timestamp}.html"
@@ -398,6 +606,34 @@ def _dump_current_dom(driver: webdriver.Chrome, inn_str: str) -> None:
         log_info("DOM текущей страницы сохранён в %s", output_path)
     except Exception as exc:
         log_error("Не удалось сохранить DOM страницы для %s: %s", inn_str, exc)
+
+
+def _dump_screenshot(driver: webdriver.Chrome, inn_str: str, label: str) -> None:
+    if not DEBUG_ARTIFACTS:
+        return
+    try:
+        SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        safe_label = re.sub(r"[^A-Za-z0-9_.-]+", "-", (label or "shot")).strip("-")
+        filename = f"screenshot-{inn_str}-{safe_label}-{timestamp}.png"
+        output_path = SCREENSHOT_DIR / filename
+        if driver.save_screenshot(str(output_path)):
+            log_info("Скриншот сохранён в %s", output_path)
+    except Exception as exc:
+        log_error("Не удалось сохранить скриншот для %s: %s", inn_str, exc)
+
+
+def _dump_debug_artifacts(driver: webdriver.Chrome, inn_str: str, label: str) -> None:
+    if not DEBUG_ARTIFACTS:
+        return
+    try:
+        current_url = getattr(driver, "current_url", "")
+        if current_url:
+            log_info("Текущий URL (%s): %s", label, current_url)
+    except Exception:
+        pass
+    _dump_screenshot(driver, inn_str, label)
+    _dump_current_dom(driver, inn_str)
 
 
 def _period_label_xpath() -> str:
@@ -456,38 +692,143 @@ def _month_text_condition() -> str:
         "за месяц",
         "текущий месяц",
         "этот месяц",
+        "предыдущий месяц",
+        "прошлый месяц",
+        "последний месяц",
         "месяц",
     ]
     return " or ".join(_text_condition(term) for term in variants)
 
 
+def _find_period_selector_in_menu(container: WebElement) -> Optional[WebElement]:
+    xpath = (
+        ".//*[(self::button or self::div or self::span)"
+        " and (@aria-haspopup='listbox' or @aria-haspopup='menu' or @aria-controls or @role='combobox')]"
+        " | .//select | .//*[@role='combobox']"
+    )
+    try:
+        elements = container.find_elements(By.XPATH, xpath)
+    except Exception:
+        return None
+    for element in elements:
+        try:
+            if element.find_elements(By.XPATH, "ancestor::*[@data-tid='DateKindSelect']"):
+                continue
+        except Exception:
+            pass
+        return element
+    return None
+
+
+def _click_menu_option_by_text(driver: webdriver.Chrome, text: str, exact: bool = False) -> bool:
+    log_action("Выбираем пункт меню: %s", text)
+    base = "//*[self::div or self::button or self::li or self::span]"
+    if exact:
+        cond = f"[normalize-space(.)='{text}']"
+    else:
+        cond = f"[{_text_condition(text)}]"
+    scope = (
+        "[ancestor::*[@role='listbox' or @role='menu' or contains(@id,'Select__menu') "
+        "or contains(@class,'Select__menu') or contains(@id,'Popup__root') "
+        "or contains(@data-tid,'Popup') or contains(@data-tid,'Menu')]]"
+    )
+    option_xpath = f"{base}{cond}{scope}"
+    try:
+        option = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, option_xpath)))
+    except TimeoutException:
+        if exact:
+            return _click_menu_option_by_text(driver, text, exact=False)
+        return False
+    highlight_element(driver, option, "rgba(0, 128, 0, 0.25)")
+    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", option)
+    try:
+        option.click()
+    except Exception:
+        driver.execute_script("arguments[0].click();", option)
+    pause_action(f"Выбор пункта '{text}'")
+    return True
+
+
+def _read_date_kind_label(container: WebElement) -> Optional[str]:
+    try:
+        label = container.find_element(By.XPATH, ".//*[@data-tid='DateKindSelect']//*[@data-tid='Select__label']")
+        text = (label.text or label.get_attribute("textContent") or "").strip()
+        return text or None
+    except NoSuchElementException:
+        return None
+
+
+def _click_radio_by_label(container: WebElement, label_text: str) -> bool:
+    text_norm = label_text.strip()
+    if not text_norm:
+        return False
+    log_action("Ищем радиокнопку: %s", text_norm)
+    xpath_variants = [
+        (
+            ".//label[.//input[@type='radio'] and .//*[normalize-space(.)='{text}']]".format(
+                text=text_norm
+            )
+        ),
+        (
+            ".//*[self::span or self::div or self::label][normalize-space(.)='{text}']"
+            "/ancestor::label[1]".format(text=text_norm)
+        ),
+        (
+            ".//*[@role='radio' and .//*[normalize-space(.)='{text}']]".format(text=text_norm)
+        ),
+    ]
+    for xpath in xpath_variants:
+        try:
+            elements = container.find_elements(By.XPATH, xpath)
+        except Exception:
+            elements = []
+        if not elements:
+            continue
+        target = elements[0]
+        try:
+            target.click()
+        except Exception:
+            try:
+                container._parent.execute_script("arguments[0].click();", target)
+            except Exception:
+                continue
+        log_action("Радиокнопка выбрана: %s", text_norm)
+        return True
+    return False
+
+
 def _month_option_xpath() -> str:
     base = (
-        "//div[@role='option' or contains(@data-tid,'MenuItem') or contains(@class,'MenuItem') "
+        "//div[@role='option' or @role='menuitem' or @role='menuitemcheckbox' or @role='menuitemradio' "
+        "or contains(@data-tid,'MenuItem') or contains(@data-tid,'PopupMenu__item') or contains(@class,'MenuItem') "
         "or contains(@class,'Select__option') or contains(@class,'Option')]"
-        "|//li[@role='option' or contains(@data-tid,'MenuItem') or contains(@class,'MenuItem')]"
-        "|//button[@role='option' or contains(@data-tid,'MenuItem') or contains(@class,'MenuItem') "
-        "or contains(@class,'Select__option')]"
-        "|//span[@role='option' or ancestor::li[@role='option'] or ancestor::div[@role='option']]"
+        "|//li[@role='option' or @role='menuitem' or contains(@data-tid,'PopupMenu__item') "
+        "or contains(@data-tid,'MenuItem') or contains(@class,'MenuItem')]"
+        "|//button[@role='option' or @role='menuitem' or contains(@data-tid,'MenuItem') "
+        "or contains(@data-tid,'PopupMenu__item') or contains(@class,'MenuItem') or contains(@class,'Select__option')]"
+        "|//span[@role='option' or @role='menuitem' or ancestor::li[@role='menuitem'] "
+        "or ancestor::div[@role='menuitem'] or ancestor::div[contains(@data-tid,'PopupMenu__item')] "
+        "or ancestor::div[contains(@data-tid,'MenuItem')]]"
         "|//option"
     )
     return f"({base})[{_month_text_condition()}]"
 
 
+def _filters_button_xpath() -> str:
+    return "//*[@data-tid='SearchButton']//button[@data-tid='Button__rootElement']"
+
+
 def _open_filters_dialog(driver: webdriver.Chrome) -> WebElement:
     wait = WebDriverWait(driver, 20)
-    log_info("Открываем диалог фильтров документов.")
-    filters_btn = wait.until(
-        EC.element_to_be_clickable(
-            (
-                By.XPATH,
-                "//button[contains(translate(normalize-space(.),'ФИЛЬТР','фильтр'),'фильтр')]",
-            )
-        )
-    )
+    log_action("Открываем диалог фильтров документов.")
+    filters_btn = wait.until(EC.element_to_be_clickable((By.XPATH, _filters_button_xpath())))
     highlight_element(driver, filters_btn, "rgba(0, 128, 0, 0.25)")
     driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", filters_btn)
-    filters_btn.click()
+    try:
+        filters_btn.click()
+    except Exception:
+        driver.execute_script("arguments[0].click();", filters_btn)
+    log_action("Клик по кнопке 'Фильтры'.")
     dialog = wait.until(EC.presence_of_element_located((By.XPATH, _dialog_xpath())))
     return dialog
 
@@ -540,7 +881,7 @@ def _open_period_selector(driver: webdriver.Chrome, dialog: WebElement) -> None:
 
 
 def _choose_month_option(driver: webdriver.Chrome) -> None:
-    log_debug("Выбираем опцию периода 'За месяц'.")
+    log_action("Выбираем опцию периода 'Месяц'.")
     wait = WebDriverWait(driver, 15)
     try:
         option = wait.until(EC.element_to_be_clickable((By.XPATH, _month_option_xpath())))
@@ -549,6 +890,12 @@ def _choose_month_option(driver: webdriver.Chrome) -> None:
         option = options[0] if options else None
         if option is None:
             raise
+    try:
+        option_text = (option.text or option.get_attribute("textContent") or "").strip()
+        if option_text:
+            log_action("Найдена опция периода: %s", _normalize_ws(option_text))
+    except Exception:
+        pass
     highlight_element(driver, option, "rgba(0, 128, 0, 0.25)")
     driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", option)
     try:
@@ -559,20 +906,37 @@ def _choose_month_option(driver: webdriver.Chrome) -> None:
 
 
 def _apply_filters(driver: webdriver.Chrome, dialog: WebElement) -> None:
-    log_debug("Применяем выбранные фильтры.")
+    log_action("Применяем выбранные фильтры.")
     wait = WebDriverWait(driver, 15)
     driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", dialog)
-    apply_btn = wait.until(
-        EC.element_to_be_clickable(
-            (
-                By.XPATH,
-                f"{_dialog_xpath()}//button[contains(translate(normalize-space(.),'ПРИМЕНИТЬ','применить'),'применить')]",
+    apply_btn = None
+    try:
+        apply_btn = dialog.find_element(
+            By.XPATH,
+            ".//*[@data-tid='searchLightboxSubmitButton']//button[@data-tid='Button__rootElement']",
+        )
+    except NoSuchElementException:
+        apply_btn = None
+
+    if apply_btn is None:
+        apply_btn = wait.until(
+            EC.element_to_be_clickable(
+                (
+                    By.XPATH,
+                    f"{_dialog_xpath()}//button[contains(translate(normalize-space(.),'ПРИМЕНИТЬ','применить'),'применить')]",
+                )
             )
         )
-    )
+    else:
+        if apply_btn.get_attribute("disabled"):
+            log_action("Кнопка 'Применить' не активна — фильтры не применяем.")
+            return
+        wait.until(lambda d: apply_btn.is_enabled())
+
     highlight_element(driver, apply_btn, "rgba(0, 128, 0, 0.25)")
     driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", apply_btn)
     apply_btn.click()
+    log_action("Клик по кнопке 'Применить'.")
     pause_action("Клик по кнопке 'Применить'")
     try:
         wait.until(EC.staleness_of(dialog))
@@ -581,6 +945,8 @@ def _apply_filters(driver: webdriver.Chrome, dialog: WebElement) -> None:
 
 
 DOCUMENT_ROW_XPATH = (
+    "//*[@data-tid='singleLetter' or @data-tid='singleDocument' or "
+    "contains(@data-tid,'DocumentsList__Row') or contains(@data-tid,'DocumentRow')]|"
     "//article[contains(@data-tid,'singleLetter') or contains(@data-tid,'letter')]|"
     "//*[@documentid or @data-document-id or @data-doc-id or @data-entity-id]"
 )
@@ -816,14 +1182,33 @@ def _status_to_bool(value: str) -> Optional[bool]:
     return None
 
 
-def _wait_for_documents_list(driver: webdriver.Chrome) -> List[WebElement]:
-    wait = WebDriverWait(driver, 40)
-    log_debug("Ожидаем появление списка документов.")
-    wait.until(lambda d: len(d.find_elements(By.XPATH, DOCUMENT_ROW_XPATH)) > 0)
-    time.sleep(1)
+def _wait_for_documents_list(driver: webdriver.Chrome, inn_str: str = "") -> List[WebElement]:
+    wait = WebDriverWait(driver, WAIT_DOCS_TIMEOUT)
+    log_action("Ожидаем появление списка документов.")
+    try:
+        wait.until(lambda d: len(d.find_elements(By.XPATH, DOCUMENT_ROW_XPATH)) > 0)
+    except TimeoutException:
+        log_action("Документы не найдены по основному XPATH.")
+        if inn_str:
+            _dump_debug_artifacts(driver, inn_str, "wait-documents-timeout")
+        alt_selectors = {
+            "singleLetter": "//*[@data-tid='singleLetter']",
+            "singleDocument": "//*[@data-tid='singleDocument']",
+            "letterList": "//*[@data-tid='letterList']",
+            "documentId": "//*[@documentid or @data-document-id or @data-doc-id or @data-entity-id]",
+        }
+        for name, xpath in alt_selectors.items():
+            try:
+                count = len(driver.find_elements(By.XPATH, xpath))
+            except Exception:
+                count = 0
+            log_action("Найдено по %s: %d", name, count)
+        return []
+    if WAIT_DOCS_POST_DELAY > 0:
+        time.sleep(WAIT_DOCS_POST_DELAY)
     elements = driver.find_elements(By.XPATH, DOCUMENT_ROW_XPATH)
     visible = [el for el in elements if el.is_displayed()]
-    log_info("Отображается %d строк(и) документов на странице.", len(visible))
+    log_action("Отображается %d строк(и) документов на странице.", len(visible))
     return visible
 
 
@@ -902,37 +1287,41 @@ def _extract_sender(driver: webdriver.Chrome, element: WebElement) -> Tuple[str,
 def _collect_sender_details(driver: webdriver.Chrome, sender_element: WebElement) -> Dict[str, Optional[str]]:
     details: Dict[str, Optional[str]] = {}
     try:
+        driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", sender_element)
+        log_action("Наводим курсор на отправителя для тултипа.")
         ActionChains(driver).move_to_element(sender_element).pause(0.2).perform()
     except Exception as exc:
         log_debug("Не удалось навести курсор на отправителя: %s", exc)
         return details
+    raw_text = ""
     tooltip_locator = (
         By.XPATH,
-        "//div[@data-tid='Popup__root']//p[contains(translate(normalize-space(.),'ИНН','инн'),'инн')]",
+        "//div[@data-tid='Popup__root' or @role='tooltip' or contains(@class,'Popup') or "
+        "contains(@class,'tooltip')]",
     )
-    tooltip: Optional[WebElement] = None
     try:
         tooltip = WebDriverWait(driver, 3).until(EC.visibility_of_element_located(tooltip_locator))
+        raw_text = (tooltip.text or "").strip()
+        if not raw_text:
+            raw_text = (tooltip.get_attribute("textContent") or "").strip()
     except TimeoutException:
-        log_debug("Всплывающая подсказка с реквизитами отправителя не появилась.")
-    if tooltip is None:
-        return details
-    raw_text = (tooltip.text or "").strip()
+        raw_text = ""
+
     if not raw_text:
-        raw_text = (tooltip.get_attribute("textContent") or "").strip()
+        for attr in ("title", "aria-label", "data-tooltip", "data-tip"):
+            value = (sender_element.get_attribute(attr) or "").strip()
+            if value:
+                raw_text = value
+                break
+
     if not raw_text:
-        log_debug("Подсказка отображается, но текст получить не удалось.")
+        log_debug("Подсказка отправителя не найдена.")
         return details
+
     parsed = _parse_sender_tooltip_text(raw_text)
     details.update(parsed)
-    if details.get("inn") or details.get("kpp"):
-        log_info(
-            "Получены реквизиты отправителя из подсказки: ИНН=%s, КПП=%s",
-            details.get("inn"),
-            details.get("kpp"),
-        )
-    else:
-        log_debug("Подсказка отправителя получена, но ИНН/КПП отсутствуют. Текст: %s", raw_text)
+    if details.get("full_name"):
+        log_action("Получено имя отправителя из подсказки: %s", details.get("full_name"))
     try:
         ActionChains(driver).move_by_offset(20, 0).perform()
     except Exception:
@@ -1087,16 +1476,17 @@ def _extract_date(element: WebElement) -> Optional[str]:
 def _collect_documents_from_page(
     driver: webdriver.Chrome, inn_str: str, date_mode: bool = False
 ) -> List[Dict[str, Any]]:
-    rows = _wait_for_documents_list(driver)
+    rows = _wait_for_documents_list(driver, inn_str)
     try:
-        _dump_current_dom(driver, inn_str)
+        if DUMP_DOM_EACH_PAGE:
+            _dump_current_dom(driver, inn_str)
     except Exception:
         pass
     documents: List[Dict[str, Any]] = []
     emitted_record_keys: Set[str] = set()
-    log_info("Начинаем разбор %d строк документов для ИНН %s.", len(rows), inn_str)
+    log_action("Начинаем разбор %d строк документов для ИНН %s.", len(rows), inn_str)
     for row_index, row in enumerate(rows, start=1):
-        log_debug("Обрабатываем строку #%d для ИНН %s", row_index, inn_str)
+        log_action("Обрабатываем строку #%d для ИНН %s", row_index, inn_str)
         highlight_element(driver, row, "rgba(0, 255, 0, 0.15)")
         if date_mode:
             sender = ""
@@ -1157,14 +1547,14 @@ def _collect_documents_from_page(
                         row_index,
                         node_index,
                     )
-                    log_debug(
+                    log_action(
                         "Сгенерирован синтетический идентификатор %s для документа '%s' (строка #%d, узел #%d).",
                         record_id,
                         name,
                         row_index,
                         node_index,
                     )
-                log_debug(
+                log_action(
                     "Документ найден: id=%s, name=%s, sender=%s, date=%s, summ=%s, summ_nds=%s, status=%s",
                     record_id,
                     name,
@@ -1198,7 +1588,7 @@ def _collect_documents_from_page(
                             record["kpp_popup"] = sender_kpp
                 documents.append(record)
                 emitted_record_keys.add(dedupe_key)
-    log_info("Собрано %d документов на странице для ИНН %s.", len(documents), inn_str)
+    log_action("Собрано %d документов на странице для ИНН %s.", len(documents), inn_str)
     return documents
 
 
@@ -1571,6 +1961,8 @@ def _find_original_format_button(driver: webdriver.Chrome) -> WebElement:
 
 
 def highlight_element(driver: webdriver.Chrome, element: WebElement, color: str) -> None:
+    if not HIGHLIGHT_UI or FAST_MODE:
+        return
     try:
         driver.execute_script(
             "arguments[0].style.transition='background-color 0.3s ease';"
