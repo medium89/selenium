@@ -1414,6 +1414,7 @@ def _extract_summaries(element: WebElement) -> Dict[str, Optional[float]]:
         [
             ".//*[@data-tid='DocumentMetadata__primary']",
             ".//*[@data-tid='DocumentMetadata__sum']",
+            ".//*[@data-tid='metaData']//span[not(contains(translate(normalize-space(.),'НДС','ндс'),'ндс'))][1]",
             ".//span[contains(@class,'JnKP0')]",
         ],
     )
@@ -1421,6 +1422,7 @@ def _extract_summaries(element: WebElement) -> Dict[str, Optional[float]]:
         element,
         [
             ".//*[@data-tid='DocumentMetadata__additional']",
+            ".//*[@data-tid='metaData']//span[contains(translate(normalize-space(.),'НДС','ндс'),'ндс')]",
             ".//span[contains(@class,'L2xKE')]",
             ".//*[contains(translate(normalize-space(.),'НДС','ндс'),'ндс')]",
         ],

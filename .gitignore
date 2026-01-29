@@ -10,7 +10,7 @@ __pycache__/
 *.egg-info/
 .build/
 dist/
-
+.env
 # IDE/инструменты
 .vscode/
 .idea/
